@@ -5,32 +5,7 @@
 # This is definately not secure or as cool as docker, but it is a nice way to deploy
 # applications on a openvz container (which doesnt run docker).
 #
-# Features:
-#   * gives ssh login with (fake) root access to container
-#   * allows installing packages and running network applications (on userport-range)
-#   * *should* be compatible with docker, just tar your jail-dir like so:
-#       tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
-#
-# Usage:
-#  $ debootstrap-container add mycontainer
-#  [x] created container in /srv/containers
-#  [x] adding user
-#  [x] done..now login using ssh with login/pass: lemon/lemon
-#  $ ssh mycontainer@localhost
-#  root@mycontainer# whoami
-#  root@mycontainer# root
-#  root@mycontainer# apt-get install python2
-#  root@mycontainer# exit
-#  $ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
-#  [x] analyzing additional installed packages + backing up dirs: srv etc opt
-#  [x] written /tmp/lemon.tar.gz
-#  $ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
-#  $ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
-#  $ ssh mycontainer2@localhost
-#  root@mycontainer# whoami (..and so on..)
-#
-# now the funpart is that python2 is only installed in the container.
-# removing /srv/containers means all packages in the container are removed as well.
+# https://github.com/coderofsalvation/debootstrap-container
 
 requirements=(debootstrap fakechroot fakeroot)
 image="wheezy"
@@ -63,7 +38,8 @@ adduser(){
   echo -e "fakechroot fakeroot chroot $jailpath/$name /bin/bash\nexit\n" > $jailpath/$name/.profile
   echo -e "export HOME=/" >  $jailpath/$name/.bashrc
   echo "$name:x:1000:100:$name:$jailpath/$name:/bin/bash" >> /etc/passwd
-  echo "$name"":""$name" |chpasswd
+  read -p "enter password for ssh-user '$name': " $passwd
+  echo "$name"":""$passwd" |chpasswd
   chmod go-w $jailpath/$name
   chown -R $name:users "$jailpath/$name/"*
   chmod ug+rwX "$jailpath/$name/"*

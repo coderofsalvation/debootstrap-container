@@ -22,7 +22,8 @@ I had to go another road to satisfy my needs:
     $ debootstrap-container add mycontainer
     [x] created container in /srv/containers
     [x] adding user
-    [x] done..now login using ssh with login/pass: lemon/lemon
+    [x] please enter password for ssh-user 'mycontainer': foo
+    [x] done..now login using ssh with login/pass: mycontainer/foo
     $ ssh mycontainer@localhost
     root@mycontainer# whoami
     root@mycontainer# root
