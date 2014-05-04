@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# wrapper for debootstrap fakechroot fakeroot to easily generate persistent debiancontainers
+# for installing/running applications/packages *outside* the real host.
+# This is definately not secure or as cool as docker, but it is a nice way to deploy
+# applications on a openvz container (which doesnt run docker).
+#
+# Features:
+#   * gives ssh login with (fake) root access to container
+#   * allows installing packages and running network applications (on userport-range)
+#   * *should* be compatible with docker, just tar your jail-dir like so:
+#       tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
+#
+# Usage:
+#  $ debootstrap-container add mycontainer
+#  [x] created container in /srv/containers
+#  [x] adding user
+#  [x] done..now login using ssh with login/pass: lemon/lemon
+#  $ ssh mycontainer@localhost
+#  root@mycontainer# whoami
+#  root@mycontainer# root
+#  root@mycontainer# apt-get install python2
+#  root@mycontainer# exit
+#  $ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
+#  [x] analyzing additional installed packages + backing up dirs: srv etc opt
+#  [x] written /tmp/lemon.tar.gz
+#  $ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
+#  $ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
+#  $ ssh mycontainer2@localhost
+#  root@mycontainer# whoami (..and so on..)
+#
+# now the funpart is that python2 is only installed in the container.
+# removing /srv/containers means all packages in the container are removed as well.
+
+requirements=(debootstrap fakechroot fakeroot)
+image="wheezy"
+backupdirs="srv etc opt"
+jailpath="/srv/containers"
+
+genimage(){ 
+  echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
+  debootstrap --variant=minbase $image $jailpath/minbase || echo "something went wrong :("
+}
+
+# adds container to filesystem
+add(){
+  name="$1"; [[ -n "$2" ]] && jailpath="$2"; [[ -n "$3" ]] && image="$3"
+  [[ ! -n "$1" ]] && { echo "usage: $0 add <containername> [containerpath] [distroname]"; exit 1; }
+  [[ ! -d $jailpath ]] && mkdir $jailpath
+  [[ ! -d $jailpath/minbase ]] && genimage
+  [[ -d $jailpath/$name ]] && { echo "$jailpath/$name already exists..exiting"; exit 1; }
+  [[ ! -d $jailpath/minbase ]] && { echo "could not find $jailpath/minbase, debootstrap failed earlier probably"; exit 1; }
+  cp -r $jailpath/minbase $jailpath/$name
+  fakechroot fakeroot chroot $jailpath/$name dpkg --get-selections > $jailpath/$name/srv/packages.minbase.txt # remember packages
+  echo "created container in $jailpath"
+  [[ $? == 0 ]] && adduser $name
+}
+
+# adds user and gives (fake) root ssh access to container
+adduser(){
+  name="$1"
+  echo "adding user"
+  echo -e "fakechroot fakeroot chroot $jailpath/$name /bin/bash\nexit\n" > $jailpath/$name/.profile
+  echo -e "export HOME=/" >  $jailpath/$name/.bashrc
+  echo "$name:x:1000:100:$name:$jailpath/$name:/bin/bash" >> /etc/passwd
+  echo "$name"":""$name" |chpasswd
+  chmod go-w $jailpath/$name
+  chown -R $name:users "$jailpath/$name/"*
+  chmod ug+rwX "$jailpath/$name/"*
+  echo "done..now login using ssh with login/pass: $name/$name"
+}
+
+check(){
+  OK=0
+  for i in "${requirements[@]}"; do 
+    which $i &>/dev/null || {
+      read -p "$i is not installed..apt-get now? (y/n) " answer
+      [[ "$answer" == "y" ]] && sudo apt-get -y install $i || OK=1
+    }
+  done
+  return $OK
+}
+
+export(){
+  dir="$1"; [[ -n "$2" ]] && outfile="$2" || outfile="/tmp/$(basename "$dir").tar.gz"
+  [[ ! -d "$dir" ]] && { echo "container $dir does not exist"; exit 1; }
+  echo "analyzing additional installed packages + backing up dirs: $backupdirs"
+  fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/srv/packages.txt # dump packages
+  fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /srv/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install /g'> $dir/srv/install
+  chmod 755 $dir/srv/install
+  cd $dir; tar cpjf "$outfile" ${backupdirs}
+  echo "written $outfile"
+}
+
+import(){
+  dir="$1"; targz="$2"
+  [[ ! -d "$dir" ]] && { echo "creating new container"; add $(basename $dir); }
+  [[ ! -d "$dir/usr" ]] && { echo "container $dir is not a container"; exit 1; }
+  echo "importing new installed packages + importing dirs: $backupdirs"
+  cd "$dir" && for bdir in $backupdirs;  do rm -rf $bdir; done
+  tar vxpjf $targz | while read line; do tput el; printf "\r[x] unpacking: $line"; done; echo ""
+  fakechroot fakeroot chroot "$dir" bash /srv/install  # install packages
+  echo "done" 
+}
+
+prettyprint(){ 
+  cat - | while read line; do echo "[x] $line"; done;
+}
+
+check && [[ -n "$1" ]] && { "$@" | prettyprint; } || add
