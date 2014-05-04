@@ -3,12 +3,12 @@ debootstrap-container
 
 <img src=".res/logo.png"/>
 
-simple way of running multiple debian containers on a (openvz) VPS instead of docker 
+simple way of running multiple debian containers on a (openvz) VPS 
 
 ### Why
 
 I am a huge fan of [docker](http://docker.io) but unfortunately I had to do multiple projects inside one VPS server.
-I could not get docker working, and solutions like [sekexe](https://github.com/jpetazzo/sekexe) pointed into more possible hassle.
+I could not get docker working, and solutions like [sekexe](https://github.com/jpetazzo/sekexe) or jailkit pointed into more possible hassle.
 I had to go another road to satisfy my needs:
 
 * I want to install packages in a container, *outside* the real host
