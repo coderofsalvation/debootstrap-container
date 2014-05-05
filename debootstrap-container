@@ -14,7 +14,10 @@ jailpath="/srv/containers"
 
 genimage(){ 
   echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
-  debootstrap --variant=minbase $image $jailpath/minbase || echo "something went wrong :("
+  debootstrap --variant=minbase $image $jailpath/minbase || { echo "something went wrong :("; return 1; }
+  rm $jailpath/minbase/var/{run,lock}; mkdir $jailpath/minbase/var/{run,lock}; # needed in order to run applications 
+  rm $jailpath/minbase/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
+  ln -s /lib/x86_64-linux-gnu/libc.so.6 $jailpath/minbase/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
 }
 
 # adds container to filesystem
@@ -34,6 +37,7 @@ add(){
 # adds user and gives (fake) root ssh access to container
 adduser(){
   name="$1"
+  read -p "add user? (y/n) " add; [[ ! "$add" == "y" ]] && return 0; 
   echo "adding user"
   echo -e "fakechroot fakeroot chroot $jailpath/$name /bin/bash\nexit\n" > $jailpath/$name/.profile
   echo -e "export HOME=/" >  $jailpath/$name/.bashrc
