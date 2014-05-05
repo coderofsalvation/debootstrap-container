@@ -37,7 +37,7 @@ Or how about exporting our container to a tarball
 
     $ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
     [x] analyzing additional installed packages + backing up dirs: srv etc opt
-    [x] written /tmp/lemon.tar.gz
+    [x] written /tmp/mycontainer.tar.gz
 
 Only the newly installed packagenames + some dirs are in the tar (instead of the whole rootfilesystem).
 Lets overwrite our container with an exported tarball:
