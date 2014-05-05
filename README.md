@@ -17,16 +17,17 @@ simple way of running multiple debian containers on a (openvz) VPS
     $ ssh mycontainer@localhost
     root@mycontainer# whoami
     root@mycontainer# root
-    root@mycontainer# passwd (enter my newpassword)
     root@mycontainer# apt-get install python2
     root@mycontainer# exit
 
-now the funpart is that python2 is only installed in the container.
+now the funpart is: python2 is only installed in the container.
 removing /srv/containers means all packages in the container are removed as well.
 
 If you are only interested in local development, you can easily access the container locally as well:
 
-    $ debootstrap-container run /src/containers/foo
+    $ whoami 
+    myusername
+    $ debootstrap-container run /srv/containers/foo
     root@mycontainer# whoami
     root@mycontainer# root
 
@@ -36,16 +37,23 @@ Or how about exporting our container to a tarball
     [x] analyzing additional installed packages + backing up dirs: srv etc opt
     [x] written /tmp/lemon.tar.gz
 
-Only the newly installed packagenames + some dirs are in the tar (instead of the whole rootfilesystem)
+Only the newly installed packagenames + some dirs are in the tar (instead of the whole rootfilesystem).
+Lets overwrite our container with an exported tarball:
 
     $ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
+    [x] Reading package lists...
+    [x] Building dependency tree...
+    [x] The following extra packages will be installed:
+    [x] python2 
 
-We just updated our container with a tarball
+Or simple start a fresh container 'mycontainer2' based on our exported tarball:
 
     $ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
-
-We just updated imported our container to a new tarball
-    
+    [x] Reading package lists...
+    [x] Building dependency tree...
+    [x] The following extra packages will be installed:
+    [x] python2 
+    [x] done
     $ ssh mycontainer2@localhost
     root@mycontainer# whoami (..and so on..)
 
@@ -60,7 +68,7 @@ I had to go another road to satisfy my needs:
 * I want to run node- or apache/lighttpd applications in a container
 * I want to ssh to a container and feel like I have root-access
 * I want to be somewhat compatible with docker
-* I want dont want to waste diskspace using images (debootstrap minimal container is 158mb)
+* I want dont want to waste diskspace (bare debootstrap container is 124mb)
 
 ### Docker compatibility
 

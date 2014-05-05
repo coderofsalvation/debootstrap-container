@@ -5,7 +5,7 @@
 # This is definately not secure or as cool as docker, but it is a nice way to deploy
 # applications on a openvz container (which doesnt run docker).
 #
-# https://github.com/coderofsalvation/debootstrap-container
+# more info: http://coderofsalvation.github.io/debootstrap-container
 
 requirements=(debootstrap fakechroot fakeroot)
 image="wheezy"
@@ -23,8 +23,9 @@ genimage(){
 
 patch(){
   dir="$1"; name="$2"
-  echo "patching"
-  rm $dir/var/{run,lock}; mkdir $dir/var/{run,lock};   # needed in order to run applications 
+  echo "patching + stripping"
+  rm $dir/var/cache/apt/archives/*
+  rm $dir/var/{run,lock} && mkdir $dir/var/{run,lock};                # needed in order to run applications 
   rm $dir/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
   ln -s /lib/x86_64-linux-gnu/libc.so.6 $dir/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
   chmod -R u+rwX "$dir/var"
@@ -86,8 +87,9 @@ export(){
     [[ ! -d "$dir" ]] && { echo "container $dir does not exist"; exit 1; }
     echo "analyzing additional installed packages + backing up dirs: $backupdirs"
     fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/srv/packages.txt # dump packages
-    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /srv/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install /g'> $dir/srv/install
-    chmod 755 $dir/srv/install
+    fakechroot fakeroot chroot "$dir" echo '# here you put your own automation scripts\n# which get triggered upon debootstrap-container import' > $dir/srv/install
+    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /srv/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install --force-yes /g'> $dir/srv/install.packages
+    chmod 755 $dir/srv/install*
     cd $dir; tar cpjf "$outfile" ${backupdirs}
     echo "written $outfile"
   } | prettyprint
@@ -102,7 +104,8 @@ import(){
     echo "importing new installed packages + importing dirs: $backupdirs"
     cd "$dir" && for bdir in $backupdirs;  do rm -rf $bdir; done
     tar vxpjf $targz | while read line; do tput el; printf "\r[x] unpacking: $line"; done; echo ""
-    fakechroot fakeroot chroot "$dir" bash /srv/install  # install packages
+    fakechroot fakeroot chroot "$dir" bash /srv/install.packages  # install packages
+    fakechroot fakeroot chroot "$dir" bash /srv/install           # install packages
     echo "done" 
   } | prettyprint
 }
