@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Debootstrap-container by coderofsalvation</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Debootstrap-container</h1>
+        <h2>simple way of running multiple debian containers on a (openvz) VPS instead of docker </h2>
+        <a href="https://github.com/coderofsalvation/debootstrap-container" class="button"><small>View project on</small>GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
+<a name="debootstrap-container" class="anchor" href="#debootstrap-container"><span class="octicon octicon-link"></span></a>debootstrap-container</h1>
+
+<p><img src="https://raw.githubusercontent.com/coderofsalvation/debootstrap-container/master/.res/logo.png"></p>
+
+<p>simple way of running multiple debian containers on a (openvz) VPS </p>
+
+<h3>
+<a name="why" class="anchor" href="#why"><span class="octicon octicon-link"></span></a>Why</h3>
+
+<p>I am a huge fan of <a href="http://docker.io">docker</a> but unfortunately I had to do multiple projects inside one VPS server.
+I could not get docker working, and solutions like <a href="https://github.com/jpetazzo/sekexe">sekexe</a> or jailkit pointed into more possible hassle.
+I had to go another road to satisfy my needs:</p>
+
+<ul>
+<li>I want to install packages in a container, <em>outside</em> the real host</li>
+<li>I want to easily import, export, delete containers</li>
+<li>I want to run node- or apache/lighttpd applications in a container</li>
+<li>I want to ssh to a container and feel like I have root-access</li>
+<li>I want to be somewhat compatible with docker</li>
+</ul><h3>
+<a name="howto" class="anchor" href="#howto"><span class="octicon octicon-link"></span></a>Howto</h3>
+
+<pre><code>$ debootstrap-container add mycontainer
+[x] created container in /srv/containers
+[x] adding user
+[x] please enter password for ssh-user 'mycontainer': foo
+[x] done..now login using ssh with login/pass: mycontainer/foo
+$ ssh mycontainer@localhost
+root@mycontainer# whoami
+root@mycontainer# root
+root@mycontainer# passwd (enter my newpassword)
+root@mycontainer# apt-get install python2
+root@mycontainer# exit
+</code></pre>
+
+<p>now the funpart is that python2 is only installed in the container.
+removing /srv/containers means all packages in the container are removed as well.</p>
+
+<pre><code>$ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
+[x] analyzing additional installed packages + backing up dirs: srv etc opt
+[x] written /tmp/lemon.tar.gz
+</code></pre>
+
+<p>We now exported our container to a tarball.</p>
+
+<pre><code>$ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
+</code></pre>
+
+<p>We just updated our container with a tarball</p>
+
+<pre><code>$ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
+</code></pre>
+
+<p>We just updated imported our container to a new tarball</p>
+
+<pre><code>$ ssh mycontainer2@localhost
+root@mycontainer# whoami (..and so on..)
+</code></pre>
+
+<h3>
+<a name="docker-compatibility" class="anchor" href="#docker-compatibility"><span class="octicon octicon-link"></span></a>Docker compatibility</h3>
+
+<p>It <em>should</em> be compatible with docker, just tar your jail-dir like so:</p>
+
+<pre><code>tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
+</code></pre>
+
+<h3>
+<a name="conclusion" class="anchor" href="#conclusion"><span class="octicon octicon-link"></span></a>Conclusion</h3>
+
+<p>This is definately not secure or as cool as docker, but it is an tidy way to deploy
+applications on a openvz container (which doesnt run docker).</p>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/coderofsalvation/debootstrap-container/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/coderofsalvation/debootstrap-container/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/coderofsalvation/debootstrap-container"></a> is maintained by <a href="https://github.com/coderofsalvation">coderofsalvation</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
