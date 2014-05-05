@@ -16,10 +16,20 @@ genimage(){
   {
     echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
     debootstrap --variant=minbase $image $jailpath/minbase || { echo "something went wrong :("; return 1; }
-    rm $jailpath/minbase/var/{run,lock}; mkdir $jailpath/minbase/var/{run,lock};   # needed in order to run applications 
-    rm $jailpath/minbase/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
-    ln -s /lib/x86_64-linux-gnu/libc.so.6 $jailpath/minbase/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
+    patch "$jailpath/minbase"
   } | prettyprint
+}
+
+patch(){
+  dir="$1"
+  echo "patching"
+  rm $dir/var/{run,lock}; mkdir $dir/var/{run,lock};   # needed in order to run applications 
+  rm $dir/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
+  ln -s /lib/x86_64-linux-gnu/libc.so.6 $dir/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
+  chown -R $name:users "$dir"*
+  chmod -R u+rwX "$dir/var"
+  chmod -R g-w "$dir"
+  chmod go-w $dir
 }
 
 # adds container to filesystem
@@ -49,9 +59,6 @@ adduser(){
     echo "$name:x:1000:100:$name:$jailpath/$name:/bin/bash" >> /etc/passwd
     read -p "enter password for ssh-user '$name': " $passwd
     echo "$name"":""$passwd" |chpasswd
-    chmod go-w $jailpath/$name
-    chown -R $name:users "$jailpath/$name/"*
-    chmod ug+rwX "$jailpath/$name/"*
     echo "done..now login using ssh with login/pass: $name/$name"
   } | prettyprint
 }
@@ -99,7 +106,7 @@ import(){
 
 run(){
   [[ ! -n "$1" ]] && { echo "usage: $0 run <containerdir>"; return 1; } 
-  fakechroot fakeroot chroot "$1"
+  fakechroot fakeroot chroot "$1" /bin/bash
 }
 
 prettyprint(){ 
