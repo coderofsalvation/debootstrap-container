@@ -9,24 +9,24 @@
 
 requirements=(debootstrap fakechroot fakeroot)
 image="wheezy"
+group=users
 backupdirs="srv etc opt"
-jailpath="/srv/containers"
+containerpath="/srv/containers"
 
 genimage(){ 
   {
     echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
-    debootstrap --variant=minbase $image $jailpath/minbase || { echo "something went wrong :("; return 1; }
-    patch "$jailpath/minbase"
+    debootstrap --variant=minbase $image $containerpath/minbase || { echo "something went wrong :("; return 1; }
+    patch "$containerpath/minbase"
   } | prettyprint
 }
 
 patch(){
-  dir="$1"
+  dir="$1"; name="$2"
   echo "patching"
   rm $dir/var/{run,lock}; mkdir $dir/var/{run,lock};   # needed in order to run applications 
   rm $dir/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
   ln -s /lib/x86_64-linux-gnu/libc.so.6 $dir/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
-  chown -R $name:users "$dir"*
   chmod -R u+rwX "$dir/var"
   chmod -R g-w "$dir"
   chmod go-w $dir
@@ -36,15 +36,15 @@ patch(){
 add(){
   [[ ! -n "$1" ]] && { echo "usage: $0 add <containername> [containerpath] [distroname]"; return 1; }
   {
-    name="$1"; [[ -n "$2" ]] && jailpath="$2"; [[ -n "$3" ]] && image="$3"
-    [[ ! -d $jailpath ]] && mkdir $jailpath
-    [[ ! -d $jailpath/minbase ]] && genimage
-    [[ -d $jailpath/$name ]] && { echo "$jailpath/$name already exists..exiting"; exit 1; }
-    [[ ! -d $jailpath/minbase ]] && { echo "could not find $jailpath/minbase, debootstrap failed earlier probably"; exit 1; }
-    cp -r $jailpath/minbase $jailpath/$name
-    fakechroot fakeroot chroot $jailpath/$name dpkg --get-selections > $jailpath/$name/srv/packages.minbase.txt # remember packages
-    echo "created container in $jailpath"
+    name="$1"; [[ -n "$2" ]] && containerpath="$2"; [[ -n "$3" ]] && image="$3"
+    [[ ! -d $containerpath ]] && mkdir $containerpath
+    [[ ! -d $containerpath/minbase ]] && genimage
+    [[ -d $containerpath/$name ]] && { echo "$containerpath/$name already exists..exiting"; exit 1; }
+    [[ ! -d $containerpath/minbase ]] && { echo "could not find $containerpath/minbase, debootstrap failed earlier probably"; exit 1; }
+    cp -r $containerpath/minbase $containerpath/$name
     [[ $? == 0 ]] && adduser $name
+    echo "created container in $containerpath"
+    fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/srv/packages.minbase.txt # remember packages
   } | prettyprint
 }
 
@@ -52,15 +52,18 @@ add(){
 adduser(){
   {
     name="$1"
-    read -p "add user? (y/n) " add; [[ ! "$add" == "y" ]] && return 0; 
-    echo "adding user"
-    echo -e "fakechroot fakeroot chroot $jailpath/$name /bin/bash\nexit\n" > $jailpath/$name/.profile
-    echo -e "export HOME=/" >  $jailpath/$name/.bashrc
-    echo "$name:x:1000:100:$name:$jailpath/$name:/bin/bash" >> /etc/passwd
-    read -p "enter password for ssh-user '$name': " $passwd
-    echo "$name"":""$passwd" |chpasswd
-    echo "done..now login using ssh with login/pass: $name/$name"
-  } | prettyprint
+    read -p "add ssh rootuser? (y/n) " add; [[ "$add" == "y" ]] && adduserssh "$name";
+    read -p "which user should be 'root' ?: " user
+    chown -R $user:$group "$containerpath/$name"*
+  } | prettyprint 
+}
+
+adduserssh(){
+  echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash\nexit\n" > $containerpath/$name/.profile
+  echo -e "export HOME=/" >  $containerpath/$name/.bashrc
+  echo "$name:x:1000:100:$name:$containerpath/$name:/bin/bash" >> /etc/passwd
+  passwd $name
+  echo "done..now login using ssh with login/pass: $name/$name"
 }
 
 check(){
@@ -105,6 +108,7 @@ import(){
 }
 
 run(){
+  [[ "$(whoami)" == root ]] && { echo "please do not run container as root"; exit 1; }
   [[ ! -n "$1" ]] && { echo "usage: $0 run <containerdir>"; return 1; } 
   fakechroot fakeroot chroot "$1" /bin/bash
 }
