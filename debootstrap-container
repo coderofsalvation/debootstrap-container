@@ -13,78 +13,97 @@ backupdirs="srv etc opt"
 jailpath="/srv/containers"
 
 genimage(){ 
-  echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
-  debootstrap --variant=minbase $image $jailpath/minbase || { echo "something went wrong :("; return 1; }
-  rm $jailpath/minbase/var/{run,lock}; mkdir $jailpath/minbase/var/{run,lock}; # needed in order to run applications 
-  rm $jailpath/minbase/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
-  ln -s /lib/x86_64-linux-gnu/libc.so.6 $jailpath/minbase/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
+  {
+    echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
+    debootstrap --variant=minbase $image $jailpath/minbase || { echo "something went wrong :("; return 1; }
+    rm $jailpath/minbase/var/{run,lock}; mkdir $jailpath/minbase/var/{run,lock};   # needed in order to run applications 
+    rm $jailpath/minbase/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
+    ln -s /lib/x86_64-linux-gnu/libc.so.6 $jailpath/minbase/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
+  } | prettyprint
 }
 
 # adds container to filesystem
 add(){
-  name="$1"; [[ -n "$2" ]] && jailpath="$2"; [[ -n "$3" ]] && image="$3"
-  [[ ! -n "$1" ]] && { echo "usage: $0 add <containername> [containerpath] [distroname]"; exit 1; }
-  [[ ! -d $jailpath ]] && mkdir $jailpath
-  [[ ! -d $jailpath/minbase ]] && genimage
-  [[ -d $jailpath/$name ]] && { echo "$jailpath/$name already exists..exiting"; exit 1; }
-  [[ ! -d $jailpath/minbase ]] && { echo "could not find $jailpath/minbase, debootstrap failed earlier probably"; exit 1; }
-  cp -r $jailpath/minbase $jailpath/$name
-  fakechroot fakeroot chroot $jailpath/$name dpkg --get-selections > $jailpath/$name/srv/packages.minbase.txt # remember packages
-  echo "created container in $jailpath"
-  [[ $? == 0 ]] && adduser $name
+  [[ ! -n "$1" ]] && { echo "usage: $0 add <containername> [containerpath] [distroname]"; return 1; }
+  {
+    name="$1"; [[ -n "$2" ]] && jailpath="$2"; [[ -n "$3" ]] && image="$3"
+    [[ ! -d $jailpath ]] && mkdir $jailpath
+    [[ ! -d $jailpath/minbase ]] && genimage
+    [[ -d $jailpath/$name ]] && { echo "$jailpath/$name already exists..exiting"; exit 1; }
+    [[ ! -d $jailpath/minbase ]] && { echo "could not find $jailpath/minbase, debootstrap failed earlier probably"; exit 1; }
+    cp -r $jailpath/minbase $jailpath/$name
+    fakechroot fakeroot chroot $jailpath/$name dpkg --get-selections > $jailpath/$name/srv/packages.minbase.txt # remember packages
+    echo "created container in $jailpath"
+    [[ $? == 0 ]] && adduser $name
+  } | prettyprint
 }
 
 # adds user and gives (fake) root ssh access to container
 adduser(){
-  name="$1"
-  read -p "add user? (y/n) " add; [[ ! "$add" == "y" ]] && return 0; 
-  echo "adding user"
-  echo -e "fakechroot fakeroot chroot $jailpath/$name /bin/bash\nexit\n" > $jailpath/$name/.profile
-  echo -e "export HOME=/" >  $jailpath/$name/.bashrc
-  echo "$name:x:1000:100:$name:$jailpath/$name:/bin/bash" >> /etc/passwd
-  read -p "enter password for ssh-user '$name': " $passwd
-  echo "$name"":""$passwd" |chpasswd
-  chmod go-w $jailpath/$name
-  chown -R $name:users "$jailpath/$name/"*
-  chmod ug+rwX "$jailpath/$name/"*
-  echo "done..now login using ssh with login/pass: $name/$name"
+  {
+    name="$1"
+    read -p "add user? (y/n) " add; [[ ! "$add" == "y" ]] && return 0; 
+    echo "adding user"
+    echo -e "fakechroot fakeroot chroot $jailpath/$name /bin/bash\nexit\n" > $jailpath/$name/.profile
+    echo -e "export HOME=/" >  $jailpath/$name/.bashrc
+    echo "$name:x:1000:100:$name:$jailpath/$name:/bin/bash" >> /etc/passwd
+    read -p "enter password for ssh-user '$name': " $passwd
+    echo "$name"":""$passwd" |chpasswd
+    chmod go-w $jailpath/$name
+    chown -R $name:users "$jailpath/$name/"*
+    chmod ug+rwX "$jailpath/$name/"*
+    echo "done..now login using ssh with login/pass: $name/$name"
+  } | prettyprint
 }
 
 check(){
-  OK=0
-  for i in "${requirements[@]}"; do 
-    which $i &>/dev/null || {
-      read -p "$i is not installed..apt-get now? (y/n) " answer
-      [[ "$answer" == "y" ]] && sudo apt-get -y install $i || OK=1
-    }
-  done
-  return $OK
+  {
+    OK=0
+    for i in "${requirements[@]}"; do 
+      which $i &>/dev/null || {
+        read -p "$i is not installed..apt-get now? (y/n) " answer
+        [[ "$answer" == "y" ]] && sudo apt-get -y install $i || OK=1
+      }
+    done
+    return $OK
+  } | prettyprint
 }
 
 export(){
-  dir="$1"; [[ -n "$2" ]] && outfile="$2" || outfile="/tmp/$(basename "$dir").tar.gz"
-  [[ ! -d "$dir" ]] && { echo "container $dir does not exist"; exit 1; }
-  echo "analyzing additional installed packages + backing up dirs: $backupdirs"
-  fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/srv/packages.txt # dump packages
-  fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /srv/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install /g'> $dir/srv/install
-  chmod 755 $dir/srv/install
-  cd $dir; tar cpjf "$outfile" ${backupdirs}
-  echo "written $outfile"
+  [[ ! -n "$1" ]] && { echo "usage: $0 export <containerdir> [outfile]"; return 1; }
+  {
+    dir="$1"; [[ -n "$2" ]] && outfile="$2" || outfile="/tmp/$(basename "$dir").tar.gz"
+    [[ ! -d "$dir" ]] && { echo "container $dir does not exist"; exit 1; }
+    echo "analyzing additional installed packages + backing up dirs: $backupdirs"
+    fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/srv/packages.txt # dump packages
+    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /srv/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install /g'> $dir/srv/install
+    chmod 755 $dir/srv/install
+    cd $dir; tar cpjf "$outfile" ${backupdirs}
+    echo "written $outfile"
+  } | prettyprint
 }
 
 import(){
+  [[ ! -n "$1" ]] && { echo "usage: $0 import <containername> <tarball>"; return 1; }
   dir="$1"; targz="$2"
-  [[ ! -d "$dir" ]] && { echo "creating new container"; add $(basename $dir); }
-  [[ ! -d "$dir/usr" ]] && { echo "container $dir is not a container"; exit 1; }
-  echo "importing new installed packages + importing dirs: $backupdirs"
-  cd "$dir" && for bdir in $backupdirs;  do rm -rf $bdir; done
-  tar vxpjf $targz | while read line; do tput el; printf "\r[x] unpacking: $line"; done; echo ""
-  fakechroot fakeroot chroot "$dir" bash /srv/install  # install packages
-  echo "done" 
+  {
+    [[ ! -d "$dir" ]] && { echo "creating new container"; add $(basename $dir); }
+    [[ ! -d "$dir/usr" ]] && { echo "container $dir is not a container"; exit 1; }
+    echo "importing new installed packages + importing dirs: $backupdirs"
+    cd "$dir" && for bdir in $backupdirs;  do rm -rf $bdir; done
+    tar vxpjf $targz | while read line; do tput el; printf "\r[x] unpacking: $line"; done; echo ""
+    fakechroot fakeroot chroot "$dir" bash /srv/install  # install packages
+    echo "done" 
+  } | prettyprint
+}
+
+run(){
+  [[ ! -n "$1" ]] && { echo "usage: $0 run <containerdir>"; return 1; } 
+  fakechroot fakeroot chroot "$1"
 }
 
 prettyprint(){ 
   cat - | while read line; do echo "[x] $line"; done;
 }
 
-check && [[ -n "$1" ]] && { "$@" | prettyprint; } || add
+check && [[ -n "$1" ]] && { "$@"; } || { add; run; import; export; }
