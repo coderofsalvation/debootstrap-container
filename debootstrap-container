@@ -6,6 +6,7 @@
 # applications on a openvz container (which doesnt run docker).
 #
 # more info: http://coderofsalvation.github.io/debootstrap-container
+set -e; # halt on error
 
 requirements=(debootstrap fakechroot fakeroot)
 image="wheezy"
@@ -43,8 +44,10 @@ add(){
     [[ -d $containerpath/$name ]] && { echo "$containerpath/$name already exists..exiting"; exit 1; }
     [[ ! -d $containerpath/minbase ]] && { echo "could not find $containerpath/minbase, debootstrap failed earlier probably"; exit 1; }
     cp -r $containerpath/minbase $containerpath/$name
-    [[ $? == 0 ]] && adduser $name
-    echo "created container in $containerpath"
+    if [[ $? == 0 ]]; then adduser $name; fi
+    read -p "enter user which should be 'root'? " user
+    chown -R $user:$group "$containerpath/$name"*
+    echo "created container '$containerpath/$name'"
     fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/srv/packages.minbase.txt # remember packages
   } | prettyprint
 }
@@ -53,18 +56,23 @@ add(){
 adduser(){
   {
     name="$1"
-    read -p "add ssh rootuser? (y/n) " add; [[ "$add" == "y" ]] && adduserssh "$name";
-    read -p "which user should be 'root' ?: " user
-    chown -R $user:$group "$containerpath/$name"*
-  } | prettyprint 
+    read -p "add ssh user? (y/n) " add; 
+    if [[ "$add" == "y" ]]; then adduserssh "$containerpath" "$name"; fi
+    [[ "$add" == "y" ]] && chown root:root $containerpath/$name/{.bashrc,.profile};
+    [[ "$add" == "y" ]] && chmod 755 $containerpath/$name/{.bashrc,.profile};
+  } 
 }
 
 adduserssh(){
+  containerpath="$1"; name="$2"
+  read -p "enter ssh username: " username
   echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash\nexit\n" > $containerpath/$name/.profile
-  echo -e "export HOME=/" >  $containerpath/$name/.bashrc
-  echo "$name:x:1000:100:$name:$containerpath/$name:/bin/bash" >> /etc/passwd
-  passwd $name
-  echo "done..now login using ssh with login/pass: $name/$name"
+  echo -e "export HOME=/\nexport PS1="\\u@$name:\w\$ "\nPROMPT_COMMAND='PS1=\"\$PS1\"'" >  $containerpath/$name/.bashrc
+  if ! grep "$username:x" /etc/passwd &>/dev/null; then 
+    echo "$username:x:1000:100:debootstrap-container:$containerpath/$name:/bin/bash" >> /etc/passwd; 
+    passwd $username
+  else echo "warning: user $username already exist"; fi
+  echo -e "done..you can login thru ssh using: ssh $username@localhost"
 }
 
 check(){
