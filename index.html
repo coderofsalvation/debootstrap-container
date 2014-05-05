@@ -1,39 +1,100 @@
 <!DOCTYPE html>
 <html>
+
   <head>
-    <meta charset='utf-8'>
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
-    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
-    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Debootstrap-container : simple way of running multiple debian containers on a (openvz) VPS" />
 
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
 
-    <title>Debootstrap-container by coderofsalvation</title>
+    <title>Debootstrap-container</title>
   </head>
 
   <body>
-    <header>
-      <div class="inner">
-        <h1>Debootstrap-container</h1>
-        <h2>simple way of running multiple debian containers on a (openvz) VPS instead of docker </h2>
-        <a href="https://github.com/coderofsalvation/debootstrap-container" class="button"><small>View project on</small>GitHub</a>
-      </div>
-    </header>
 
-    <div id="content-wrapper">
-      <div class="inner clearfix">
-        <section id="main-content">
-          <h1>
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/coderofsalvation/debootstrap-container">View on GitHub</a>
+
+          <h1 id="project_title">Debootstrap-container</h1>
+          <h2 id="project_tagline">simple way of running multiple debian containers on a (openvz) VPS</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/coderofsalvation/debootstrap-container/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/coderofsalvation/debootstrap-container/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
 <a name="debootstrap-container" class="anchor" href="#debootstrap-container"><span class="octicon octicon-link"></span></a>debootstrap-container</h1>
 
-<p><img src="https://raw.githubusercontent.com/coderofsalvation/debootstrap-container/master/.res/logo.png"></p>
-
 <p>simple way of running multiple debian containers on a (openvz) VPS </p>
+
+<h3>
+<a name="howto" class="anchor" href="#howto"><span class="octicon octicon-link"></span></a>Howto</h3>
+
+<pre><code>$ sudo debootstrap-container add mycontainer
+add ssh user? (y/n) y
+enter ssh username: myusername
+Enter new UNIX password: 
+Retype new UNIX password: 
+passwd: password updated successfully
+[x] done..you can login thru ssh using: ssh myusername@localhost
+enter user which should be 'root'? myusername
+[x] created container '/srv/containers/flop'
+$ ssh myusername@localhost
+root@mycontainer# whoami
+root@mycontainer# root
+root@mycontainer# apt-get install python2
+root@mycontainer# exit
+</code></pre>
+
+<p>now the funpart is: python2 is only installed in the container.
+removing /srv/containers means all packages in the container are removed as well.</p>
+
+<p>If you are only interested in local development, you can easily access the container locally as well:</p>
+
+<pre><code>$ whoami 
+myusername
+$ debootstrap-container run /srv/containers/foo
+root@mycontainer# whoami
+root@mycontainer# root
+</code></pre>
+
+<p>Or how about exporting our container to a tarball</p>
+
+<pre><code>$ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
+[x] analyzing additional installed packages + backing up dirs: srv etc opt
+[x] written /tmp/lemon.tar.gz
+</code></pre>
+
+<p>Only the newly installed packagenames + some dirs are in the tar (instead of the whole rootfilesystem).
+Lets overwrite our container with an exported tarball:</p>
+
+<pre><code>$ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
+[x] Reading package lists...
+[x] Building dependency tree...
+[x] The following extra packages will be installed:
+[x] python2 
+</code></pre>
+
+<p>Or simple start a fresh container 'mycontainer2' based on our exported tarball:</p>
+
+<pre><code>$ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
+[x] Reading package lists...
+[x] Building dependency tree...
+[x] The following extra packages will be installed:
+[x] python2 
+[x] done
+$ ssh mycontainer2@localhost
+root@mycontainer# whoami (..and so on..)
+</code></pre>
 
 <h3>
 <a name="why" class="anchor" href="#why"><span class="octicon octicon-link"></span></a>Why</h3>
@@ -48,47 +109,8 @@ I had to go another road to satisfy my needs:</p>
 <li>I want to run node- or apache/lighttpd applications in a container</li>
 <li>I want to ssh to a container and feel like I have root-access</li>
 <li>I want to be somewhat compatible with docker</li>
+<li>I want dont want to waste diskspace (bare debootstrap container is 124mb)</li>
 </ul><h3>
-<a name="howto" class="anchor" href="#howto"><span class="octicon octicon-link"></span></a>Howto</h3>
-
-<pre><code>$ debootstrap-container add mycontainer
-[x] created container in /srv/containers
-[x] adding user
-[x] please enter password for ssh-user 'mycontainer': foo
-[x] done..now login using ssh with login/pass: mycontainer/foo
-$ ssh mycontainer@localhost
-root@mycontainer# whoami
-root@mycontainer# root
-root@mycontainer# passwd (enter my newpassword)
-root@mycontainer# apt-get install python2
-root@mycontainer# exit
-</code></pre>
-
-<p>now the funpart is that python2 is only installed in the container.
-removing /srv/containers means all packages in the container are removed as well.</p>
-
-<pre><code>$ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
-[x] analyzing additional installed packages + backing up dirs: srv etc opt
-[x] written /tmp/lemon.tar.gz
-</code></pre>
-
-<p>We now exported our container to a tarball.</p>
-
-<pre><code>$ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
-</code></pre>
-
-<p>We just updated our container with a tarball</p>
-
-<pre><code>$ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
-</code></pre>
-
-<p>We just updated imported our container to a new tarball</p>
-
-<pre><code>$ ssh mycontainer2@localhost
-root@mycontainer# whoami (..and so on..)
-</code></pre>
-
-<h3>
 <a name="docker-compatibility" class="anchor" href="#docker-compatibility"><span class="octicon octicon-link"></span></a>Docker compatibility</h3>
 
 <p>It <em>should</em> be compatible with docker, just tar your jail-dir like so:</p>
@@ -101,25 +123,18 @@ root@mycontainer# whoami (..and so on..)
 
 <p>This is definately not secure or as cool as docker, but it is an tidy way to deploy
 applications on a openvz container (which doesnt run docker).</p>
-        </section>
-
-        <aside id="sidebar">
-          <a href="https://github.com/coderofsalvation/debootstrap-container/zipball/master" class="button">
-            <small>Download</small>
-            .zip file
-          </a>
-          <a href="https://github.com/coderofsalvation/debootstrap-container/tarball/master" class="button">
-            <small>Download</small>
-            .tar.gz file
-          </a>
-
-          <p class="repo-owner"><a href="https://github.com/coderofsalvation/debootstrap-container"></a> is maintained by <a href="https://github.com/coderofsalvation">coderofsalvation</a>.</p>
-
-          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
-        </aside>
-      </div>
+      </section>
     </div>
 
-  
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Debootstrap-container maintained by <a href="https://github.com/coderofsalvation">coderofsalvation</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
   </body>
 </html>
