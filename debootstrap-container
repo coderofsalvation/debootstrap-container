@@ -67,7 +67,7 @@ adduserssh(){
   containerpath="$1"; name="$2"
   read -p "enter ssh username: " username
   echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash\nexit\n" > $containerpath/$name/.profile
-  echo -e "export HOME=/\nexport PS1="\\u@$name:\w\$ "\nPROMPT_COMMAND='PS1=\"\$PS1\"'" >  $containerpath/$name/.bashrc
+  echo -e "export HOME=/root\nexport PS1="\\u@$name:\w\$ "\nPROMPT_COMMAND='PS1=\"\$PS1\"'" >  $containerpath/$name/.bashrc
   if ! grep "$username:x" /etc/passwd &>/dev/null; then 
     echo "$username:x:1000:100:debootstrap-container:$containerpath/$name:/bin/bash" >> /etc/passwd; 
     passwd $username
