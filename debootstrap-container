@@ -46,9 +46,12 @@ add(){
     cp -r $containerpath/minbase $containerpath/$name
     if [[ $? == 0 ]]; then adduser $name; fi
     read -p "enter user which should be 'root'? " user
+    fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/var/packages.minbase.txt # remember packages
+    echo -e '# do not edit\n# debootstrap-container will generate apt-get commands here' > $containerpath/$name/install.packages
+    echo -e '/install.packages\n# put your own automation scripts below\n# they will get triggered upon debootstrap-container import' > $containerpath/$name/install
+    chmod 755 $containerpath/$name/install
     chown -R $user:$group "$containerpath/$name"*
     echo "created container '$containerpath/$name'"
-    fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/srv/packages.minbase.txt # remember packages
   } | prettyprint
 }
 
@@ -94,9 +97,8 @@ export(){
     dir="$1"; [[ -n "$2" ]] && outfile="$2" || outfile="/tmp/$(basename "$dir").tar.gz"
     [[ ! -d "$dir" ]] && { echo "container $dir does not exist"; exit 1; }
     echo "analyzing additional installed packages + backing up dirs: $backupdirs"
-    fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/srv/packages.txt # dump packages
-    fakechroot fakeroot chroot "$dir" echo '# here you put your own automation scripts\n# which get triggered upon debootstrap-container import' > $dir/srv/install
-    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /srv/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install --force-yes /g'> $dir/srv/install.packages
+    fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/var/packages.txt # dump packages
+    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /var/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install --force-yes /g'> $dir/install.packages
     chmod 755 $dir/srv/install*
     cd $dir; tar cpjf "$outfile" ${backupdirs}
     echo "written $outfile"
@@ -112,8 +114,8 @@ import(){
     echo "importing new installed packages + importing dirs: $backupdirs"
     cd "$dir" && for bdir in $backupdirs;  do rm -rf $bdir; done
     tar vxpjf $targz | while read line; do tput el; printf "\r[x] unpacking: $line"; done; echo ""
-    fakechroot fakeroot chroot "$dir" bash /srv/install.packages  # install packages
-    fakechroot fakeroot chroot "$dir" bash /srv/install           # install packages
+    fakechroot fakeroot chroot "$dir" bash /install.packages  # install packages
+    fakechroot fakeroot chroot "$dir" bash /install           # install packages
     echo "done" 
   } | prettyprint
 }
