@@ -74,6 +74,13 @@ It *should* be compatible with docker, just tar your jail-dir like so:
 
     tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
 
+### TIPS
+
+Sharing directories across containers (originating from outside the container) can be handy.
+However, avoid symbolic links since it will confuse applications when resolving absolute paths, instead mount like so:
+
+    mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
+
 ### Conclusion
 
 This is definately not secure or as cool as docker, but it is an tidy way to deploy
