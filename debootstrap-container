@@ -8,7 +8,7 @@
 # more info: http://coderofsalvation.github.io/debootstrap-container
 set -e; # halt on error
 
-requirements=(debootstrap fakechroot fakeroot)
+requirements=(fakechroot fakeroot)
 image="wheezy"
 group=users
 backupdirs="srv etc opt"
@@ -17,6 +17,7 @@ containerpath="/srv/containers"
 genimage(){ 
   {
     echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
+    which debootstrap &>/dev/null || { echo "please install the 'debootstrap' packages (debian hint: apt-get install debootstrap)"; exit 1; }
     debootstrap --variant=minbase $image $containerpath/minbase || { echo "something went wrong :("; return 1; }
     patch "$containerpath/minbase"
   } | prettyprint
@@ -117,7 +118,7 @@ import(){
 run(){
   [[ "$(whoami)" == root ]] && { echo "please do not run container as root"; exit 1; }
   [[ ! -n "$1" ]] && { echo "usage: $0 run <containerdir>"; return 1; } 
-  fakechroot fakeroot chroot "$1" /bin/bash
+  fakechroot fakeroot chroot "$1" /bin/bash /boot.container
 }
 
 prettyprint(){ 

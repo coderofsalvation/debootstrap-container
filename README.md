@@ -74,12 +74,33 @@ It *should* be compatible with docker, just tar your jail-dir like so:
 
     tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
 
-### TIPS
+### TIP: shared directoreis
 
 Sharing directories across containers (originating from outside the container) can be handy.
 However, avoid symbolic links since it will confuse applications when resolving absolute paths, instead mount like so:
 
     mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
+
+### TIP: persistent containers
+
+You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
+This is why there's the file `/boot.container` (symlink to /etc/rc.local) where you can define daemons.
+Its a bit quickndirty but it looks like this:
+
+    /etc/init.d/lighttpd restart
+    /etc/init.d/mysql restart
+    
+    # quickndirty to let process wait forever
+    while true; do sleep 1000000; done
+    
+su myusername -c "nohup debootstrap-container run /srv/containers/lemon /boot.container" &
+
+Then make sure you run the following (as the container user):
+
+    $ su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &
+    $ disown
+
+Done! now daemons inside your container will stay alive.
 
 ### Conclusion
 
