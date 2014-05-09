@@ -93,8 +93,6 @@ Its a bit quickndirty but it looks like this:
     # quickndirty to let process wait forever
     while true; do sleep 1000000; done
     
-su myusername -c "nohup debootstrap-container run /srv/containers/lemon /boot.container" &
-
 Then make sure you run the following (as the container user):
 
     $ su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &
