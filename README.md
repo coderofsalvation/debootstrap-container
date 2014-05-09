@@ -7,14 +7,10 @@ simple way of running multiple debian containers on a (openvz) VPS
 
 ### Howto
 
+    $ sudo adduser myusername
     $ sudo debootstrap-container add mycontainer
-    add ssh user? (y/n) y
-    enter ssh username: myusername
-    Enter new UNIX password: 
-    Retype new UNIX password: 
-    passwd: password updated successfully
-    [x] done..you can login thru ssh using: ssh myusername@localhost
     enter user which should be 'root'? myusername
+    redirect user into container upon ssh-login? (y/n) y
     [x] created container '/srv/containers/flop'
     $ ssh myusername@localhost
     root@mycontainer# whoami
