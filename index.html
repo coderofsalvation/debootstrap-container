@@ -39,14 +39,10 @@
 <h3>
 <a name="howto" class="anchor" href="#howto"><span class="octicon octicon-link"></span></a>Howto</h3>
 
-<pre><code>$ sudo debootstrap-container add mycontainer
-add ssh user? (y/n) y
-enter ssh username: myusername
-Enter new UNIX password: 
-Retype new UNIX password: 
-passwd: password updated successfully
-[x] done..you can login thru ssh using: ssh myusername@localhost
+<pre><code>$ sudo adduser myusername
+$ sudo debootstrap-container add mycontainer
 enter user which should be 'root'? myusername
+redirect user into container upon ssh-login? (y/n) y
 [x] created container '/srv/containers/flop'
 $ ssh myusername@localhost
 root@mycontainer# whoami
@@ -117,6 +113,37 @@ I had to go another road to satisfy my needs:</p>
 
 <pre><code>tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
 </code></pre>
+
+<h3>
+<a name="tip-shared-directoreis" class="anchor" href="#tip-shared-directoreis"><span class="octicon octicon-link"></span></a>TIP: shared directoreis</h3>
+
+<p>Sharing directories across containers (originating from outside the container) can be handy.
+However, avoid symbolic links since it will confuse applications when resolving absolute paths, instead mount like so:</p>
+
+<pre><code>mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
+</code></pre>
+
+<h3>
+<a name="tip-persistent-containers" class="anchor" href="#tip-persistent-containers"><span class="octicon octicon-link"></span></a>TIP: persistent containers</h3>
+
+<p>You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
+This is why there's the file <code>/boot.container</code> (symlink to /etc/rc.local) where you can define daemons.
+Its a bit quickndirty but it looks like this:</p>
+
+<pre><code>/etc/init.d/lighttpd restart
+/etc/init.d/mysql restart
+
+# quickndirty to let process wait forever
+while true; do sleep 1000000; done
+</code></pre>
+
+<p>Then make sure you run the following (as the container user):</p>
+
+<pre><code>$ su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &amp;
+$ disown
+</code></pre>
+
+<p>Done! now daemons inside your container will stay alive.</p>
 
 <h3>
 <a name="conclusion" class="anchor" href="#conclusion"><span class="octicon octicon-link"></span></a>Conclusion</h3>
