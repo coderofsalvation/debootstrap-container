@@ -24,10 +24,12 @@ genimage(){
 
 patch(){
   dir="$1"; name="$2"
+  [[ ${#dir} == 0 ]] && { echo "wrong dir: $dir"; exit 1;}
   echo "patching + stripping"
   rm $dir/var/cache/apt/archives/*
   rm $dir/var/{run,lock} && mkdir $dir/var/{run,lock};                # needed in order to run applications 
   rm $dir/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
+  rm -rf $dir/root/.*
   ln -s /lib/x86_64-linux-gnu/libc.so.6 $dir/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
   chmod -R u+rwX "$dir/var"
   chmod -R g-w "$dir"
@@ -44,38 +46,30 @@ add(){
     [[ -d $containerpath/$name ]] && { echo "$containerpath/$name already exists..exiting"; exit 1; }
     [[ ! -d $containerpath/minbase ]] && { echo "could not find $containerpath/minbase, debootstrap failed earlier probably"; exit 1; }
     cp -r $containerpath/minbase $containerpath/$name
-    if [[ $? == 0 ]]; then adduser $name; fi
-    read -p "enter user which should be 'root'? " user
-    fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/var/packages.minbase.txt # remember packages
     echo -e '# do not edit\n# debootstrap-container will generate apt-get commands here' > $containerpath/$name/install.packages
-    echo -e '/install.packages\n# put your own automation scripts below\n# they will get triggered upon debootstrap-container import' > $containerpath/$name/install
-    chmod 755 $containerpath/$name/install
+    read -p "enter user which should be 'root'? " user
+    [[ ! -d /home/$user ]] && { echo "could not find /home/$user dir..aborting"; exit 1; }
     chown -R $user:$group "$containerpath/$name"*
+    adduser $user "$name"
+    fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/var/packages.minbase.txt # remember packages
+    echo -e '/install.packages\n# put your own automation scripts below\n# they will get triggered upon debootstrap-container import\n' > $containerpath/$name/install
+    chmod 770 $containerpath/$name/install
     echo "created container '$containerpath/$name'"
   } | prettyprint
 }
 
 # adds user and gives (fake) root ssh access to container
 adduser(){
-  {
-    name="$1"
-    read -p "add ssh user? (y/n) " add; 
-    if [[ "$add" == "y" ]]; then adduserssh "$containerpath" "$name"; fi
-    [[ "$add" == "y" ]] && chown root:root $containerpath/$name/{.bashrc,.profile};
-    [[ "$add" == "y" ]] && chmod 755 $containerpath/$name/{.bashrc,.profile};
-  } 
-}
-
-adduserssh(){
-  containerpath="$1"; name="$2"
-  read -p "enter ssh username: " username
-  echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash\nexit\n" > $containerpath/$name/.profile
-  echo -e "export HOME=/root\nexport PS1='root@$name# '\nPROMPT_COMMAND='PS1=\"\$PS1\"'" >  $containerpath/$name/.bashrc
-  if ! grep "$username:x" /etc/passwd &>/dev/null; then 
-    echo "$username:x:1000:100:debootstrap-container:$containerpath/$name:/bin/bash" >> /etc/passwd; 
-    passwd $username
-  else echo "warning: user $username already exist"; fi
-  echo -e "done..you can login thru ssh using: ssh $username@localhost"
+  user="$1"; name="$2"
+  mount --bind /home/$user $containerpath/$name/root
+  read -p "redirect user into container upon ssh-login? (y/n) " add; 
+  if [[ "$add" == "y" ]]; then 
+    echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash\nexit" > /home/$user/.profile
+    echo -e "export HOME=/root\nexport PS1='root@$name# '\nPROMPT_COMMAND='echo -ne \""'\033]0;${USER}@${HOSTNAME}: $name\007'"\";PS1=\"\$PS1\"'" >  $containerpath/$name/.bashrc
+    chown root:root $containerpath/$name/.bashrc /home/$user/.profile
+    chmod 700 $containerpath/$name/.bashrc 
+    chmod 744 /home/$user/.profile;
+  fi
 }
 
 check(){
