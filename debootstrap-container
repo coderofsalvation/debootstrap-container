@@ -66,7 +66,7 @@ adduser(){
   read -p "redirect user into container upon ssh-login? (y/n) " add; 
   if [[ "$add" == "y" ]]; then 
     echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash --rcfile /root/.bashrc\nexit" > /home/$user/.profile
-    echo -e "export HOME=/root\nexport PS1='root@$name# '\nPROMPT_COMMAND='echo -ne \""'\033]0;${USER}@${HOSTNAME}: $name\007'"\";PS1=\"\$PS1\"'" >  $containerpath/$name/.bashrc
+    echo -e "export HOME=/root\nexport PS1='root@$name# '\nPROMPT_COMMAND='echo -ne \""'\033]0;${USER}@${HOSTNAME}: $name\007'"\";PS1=\"\$PS1\"'" >  $containerpath/$name/root/.bashrc
     chown root:root $containerpath/$name/.bashrc /home/$user/.profile
     chmod 700 $containerpath/$name/.bashrc 
     chmod 744 /home/$user/.profile;
