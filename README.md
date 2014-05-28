@@ -91,15 +91,13 @@ Its a bit quickndirty but it looks like this:
     /etc/init.d/mysql restart
     
     # quickndirty to let process wait forever
-    while true; do sleep 1000000; done
+    while do sleep 1000000; :>/dev/null; done
     
-Then make sure you run the following (as the container user):
+Then make sure you run the following (as the root user):
 
-    $ su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &
-    $ disown
-
-Done! now daemons inside your container will stay alive.
-
+    # su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &
+    # disown
+    
 ### Conclusion
 
 This is definately not secure or as cool as docker, but it is an tidy way to deploy
