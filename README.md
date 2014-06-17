@@ -83,10 +83,10 @@ However, avoid symbolic links since it will confuse applications when resolving 
 
 ### TIP: ssh straight into your container
 
-Basically, I added the following to /etc/ssh/sshd_config:
+Basically, just add the following to /etc/ssh/sshd_config:
 
-Match User containerusername
-  ChrootDirectory /srv/containers/mycontainer
+    Match User containerusername
+      ChrootDirectory /srv/containers/mycontainer
   
 This is handy to prevent unexpected behaviour, because you'll probably want:
 
