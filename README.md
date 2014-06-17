@@ -81,6 +81,19 @@ However, avoid symbolic links since it will confuse applications when resolving 
 
     mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
 
+### TIP: ssh straight into your container
+
+Basically, I added the following to /etc/ssh/sshd_config:
+
+Match User containerusername
+  ChrootDirectory /srv/containers/mycontainer
+  
+This is handy to prevent unexpected behaviour, because you'll probably want:
+
+    echo "id;pwd" | ssh containerusername@foo.com'  
+    
+to take place in your container instead of your homedir.
+
 ### TIP: persistent containers
 
 You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
