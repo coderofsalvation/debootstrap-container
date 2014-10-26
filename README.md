@@ -96,24 +96,14 @@ to take place in your container instead of your homedir.
 
 ### TIP: persistent containers
 
-*UPDATE* I no longer do this technique above..its pretty laborous..these days I just run gnu 'screen' as root..ssh 
-into my container..and leave it there. By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container.
+These days I just :
 
-You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
-This is why there's the file `/boot.container` (symlink to /etc/rc.local) where you can define daemons.
-Its a bit quickndirty but it looks like this:
+* run gnu 'screen' as root *once* (apt-get install screen)
+* from this screen, I ssh into my container (ssh foo@localhost)
+* and leave it there (ctrl A-D)
+* 
+By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container. You can even run a screen inside your container if you want to.
 
-    /etc/init.d/lighttpd restart
-    /etc/init.d/mysql restart
-    
-    # quickndirty to let process wait forever
-    while do sleep 1000000; :>/dev/null; done
-    
-Then make sure you run the following (as the root user):
-
-    # su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &
-    # disown
-    
 ### Conclusion
 
 This is definately not secure or as cool as docker, but it is an tidy way to deploy
