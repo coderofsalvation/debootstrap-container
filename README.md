@@ -96,6 +96,9 @@ to take place in your container instead of your homedir.
 
 ### TIP: persistent containers
 
+*UPDATE* I no longer do this technique above..its pretty laborous..these days I just run gnu 'screen' as root..ssh 
+into my container..and leave it there. By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container.
+
 You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
 This is why there's the file `/boot.container` (symlink to /etc/rc.local) where you can define daemons.
 Its a bit quickndirty but it looks like this:
