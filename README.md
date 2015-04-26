@@ -81,24 +81,28 @@ However, avoid symbolic links since it will confuse applications when resolving 
 
     mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
 
+### TIP: ssh straight into your container
+
+Basically, just add the following to /etc/ssh/sshd_config:
+
+    Match User containerusername
+      ChrootDirectory /srv/containers/mycontainer
+  
+This is handy to prevent unexpected behaviour, because you'll probably want:
+
+    echo "id;pwd" | ssh containerusername@foo.com'  
+    
+to take place in your container instead of your homedir.
+
 ### TIP: persistent containers
 
-You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
-This is why there's the file `/boot.container` (symlink to /etc/rc.local) where you can define daemons.
-Its a bit quickndirty but it looks like this:
+These days I just :
 
-    /etc/init.d/lighttpd restart
-    /etc/init.d/mysql restart
-    
-    # quickndirty to let process wait forever
-    while true; do sleep 1000000; done
-    
-Then make sure you run the following (as the container user):
-
-    $ su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &
-    $ disown
-
-Done! now daemons inside your container will stay alive.
+* run gnu 'screen' as root *once* (apt-get install screen)
+* from this screen, I ssh into my container (ssh foo@localhost)
+* and leave it there (ctrl A-D)
+* 
+By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container. You can even run a screen inside your container if you want to.
 
 ### Conclusion
 
