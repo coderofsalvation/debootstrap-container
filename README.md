@@ -75,6 +75,7 @@ To keep the container alive after logouts/timeouts:
 
 * get a passwordless ssh-login working:
 
+
     $ su foo
     foo $ ssh-keygen <enter><enter><enter>
     foo $ ssh-copy-id foo@localhost
