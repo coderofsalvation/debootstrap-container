@@ -5,55 +5,31 @@ debootstrap-container
 
 simple way of running multiple debian containers on a (openvz) VPS 
 
+> CAUTION: this shellscript requires root, use at own risk.
+
 ### Howto
 
-    $ sudo adduser myusername
-    $ sudo debootstrap-container add mycontainer
-    enter user which should be 'root'? myusername
+    $ sudo debootstrap-container add foo
+    enter user which should be 'root'? foo 
+    adding new user 'foo'
+    Enter new UNIX password: 
+    Retype new UNIX password: 
+    passwd: password updated successfully 
     redirect user into container upon ssh-login? (y/n) y
-    [x] created container '/srv/containers/flop'
-    $ ssh myusername@localhost
-    root@mycontainer# whoami
-    root@mycontainer# root
-    root@mycontainer# apt-get install python2
-    root@mycontainer# exit
+    [x] created container '/srv/containers/foo'
 
-now the funpart is: python2 is only installed in the container.
-removing /srv/containers means all packages in the container are removed as well.
+    $ ssh foo@localhost
+    foo@foo# whoami
+    uid=1003 gid=1004 groups=1004
 
-If you are only interested in local development, you can easily access the container locally as well:
+    foo@foo# sudo whoami
+    root
 
-    $ whoami 
-    myusername
-    $ debootstrap-container run /srv/containers/foo
-    root@mycontainer# whoami
-    root@mycontainer# root
+    foo@foo# sudo apt-get install python2
+    foo@foo# exit
 
-Or how about exporting our container to a tarball
-
-    $ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
-    [x] analyzing additional installed packages + backing up dirs: srv etc opt
-    [x] written /tmp/mycontainer.tar.gz
-
-Only the newly installed packagenames + some dirs are in the tar (instead of the whole rootfilesystem).
-Lets overwrite our container with an exported tarball:
-
-    $ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
-    [x] Reading package lists...
-    [x] Building dependency tree...
-    [x] The following extra packages will be installed:
-    [x] python2 
-
-Or simple start a fresh container 'mycontainer2' based on our exported tarball:
-
-    $ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
-    [x] Reading package lists...
-    [x] Building dependency tree...
-    [x] The following extra packages will be installed:
-    [x] python2 
-    [x] done
-    $ ssh mycontainer2@localhost
-    root@mycontainer# whoami (..and so on..)
+now the funpart is: python2 is only installed in the container, and the sudo is 
+actually fakeroot.
 
 ### Why
 
@@ -62,7 +38,7 @@ I could not get docker working, and solutions like [sekexe](https://github.com/j
 I had to go another road to satisfy my needs:
 
 * I want to install packages in a container, *outside* the real host
-* I want to easily import, export, delete containers
+* I want to easily backup/restore containers
 * I want to run node- or apache/lighttpd applications in a container
 * I want to ssh to a container and feel like I have root-access
 * I want to be somewhat compatible with docker
@@ -74,35 +50,53 @@ It *should* be compatible with docker, just tar your jail-dir like so:
 
     tar -C /srv/containers/mycontainer -c . | docker import myname/mycontainer
 
-### TIP: shared directoreis
+### TIP: shared directories
 
 Sharing directories across containers (originating from outside the container) can be handy.
 However, avoid symbolic links since it will confuse applications when resolving absolute paths, instead mount like so:
 
     mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
 
-### TIP: ssh straight into your container
-
-Basically, just add the following to /etc/ssh/sshd_config:
-
-    Match User containerusername
-      ChrootDirectory /srv/containers/mycontainer
-  
-This is handy to prevent unexpected behaviour, because you'll probably want:
-
-    echo "id;pwd" | ssh containerusername@foo.com'  
-    
-to take place in your container instead of your homedir.
+> WARNING: if you do this, always use 'debootstrap-container delete <yourcontainer>' to delete a container.
+Using a plain 'sudo rm -rf /srv/containers/yourcontainer' might cause dataloss for folders using 'mount --bind'
 
 ### TIP: persistent containers
 
-These days I just :
+To keep the container alive after logouts/timeouts:
 
 * run gnu 'screen' as root *once* (apt-get install screen)
-* from this screen, I ssh into my container (ssh foo@localhost)
+* from this screen, ssh into your container(s) (ssh foo@localhost)
+* make sure to run ssh-copy-id on your container (passwordless login)
 * and leave it there (ctrl A-D)
-* 
+
 By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container. You can even run a screen inside your container if you want to.
+The following files would automate this:
+
+/root/.screen 
+
+    screen -T xterm -t container_foo 1 su foo -c 'ssh foo@localhost'
+    screen -T xterm -t container_bar 2 su bar -c 'ssh bar@localhost'
+
+/etc/init.d/screen 
+
+    #!/bin/bash
+    find /srv/containers -mindepth 1 -maxdepth 1 -type d | while read dir; do       
+      /root/lemon/server/debootstrap-container/debootstrap-container mount_dirs "$dir"
+    done
+    echo /usr/bin/flock -w 0 /root/.screen.lock /usr/bin/screen -s /bin/bash -d -m &
+
+This would mount some needed folders (/sys /proc) and start+detach the screen during startup.
+
+### Sudo 
+
+The containers use a sudo-shellscript at /usr/bin/sudo which uses fakeroot.
+To prevent users from installing software please remove the /usr/bin/fakeroot binary.
+
+### History
+
+* Sun Apr 26 21:43:47 CEST 2015 refactor: debootstrap doesnt run by root-user, but with sudo cmds
+* Sun Apr 26 21:43:47 CEST 2015 refactor: added remove function 
+* Mon Apr 27 12:53:50 CEST 2015 refactor: removed import/export: just tar the container at /src/container/*
 
 ### Conclusion
 

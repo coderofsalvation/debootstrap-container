@@ -8,78 +8,153 @@
 # more info: http://coderofsalvation.github.io/debootstrap-container
 set -e; # halt on error
 
-requirements=(fakechroot fakeroot)
-image="wheezy"
+requirements=(debootstrap fakechroot fakeroot)
+release="wheezy"
+variant="minbase"
 group=users
+backupdirs="srv etc opt"
 containerpath="/srv/containers"
 
-genimage(){ 
+genimage(){
   {
-    echo -e "about to generate minbase debian filesystem\n\nfirst time will take a while..\n"; sleep 1s; 
-    which debootstrap &>/dev/null || { echo "please install the 'debootstrap' packages (debian hint: apt-get install debootstrap)"; exit 1; }
-    debootstrap --variant=minbase $image $containerpath/minbase || { echo "something went wrong :("; return 1; }
-    patch "$containerpath/minbase"
+    echo -e "about to generate $release ($variant) template debian filesystem\n\nfirst time will take a while..\n"; sleep 1s;
+    packages="fakeroot,fakechroot"
+    debootstrap --include="$packages" --variant=$variant $release $containerpath/$release"-"$variant || { echo "something went wrong :("; return 1; }
+    patch "$containerpath/$release"-"$variant"
   } | prettyprint
 }
 
+check_safe(){
+  cd "$1" && [[ $(pwd) == "/" ]] && { echo "wrong dir: $(pwd)"; exit 1;  } 
+}
+
 patch(){
-  dir="$1"; name="$2"
+  dir="$1";
   [[ ${#dir} == 0 ]] && { echo "wrong dir: $dir"; exit 1;}
-  echo "patching + stripping"
-  rm $dir/var/cache/apt/archives/*
-  rm $dir/var/{run,lock} && mkdir $dir/var/{run,lock};                # needed in order to run applications 
-  rm $dir/lib/x86_64-linux-gnu/libc.so.6;                           # not sure why but I had cases
-  rm -rf $dir/root/.*
-  ln -s /lib/x86_64-linux-gnu/libc.so.6 $dir/lib/x86_64-linux-gnu/. # where I could only chroot succesfully by doing so
+  set -u 
+  check_safe "$dir"
+  [[ "$release" == "wheezy" ]] && wheezy_bugfix "$dir"
+  echo -e "#!/bin/bash\nfakeroot /bin/bash -c \"export HOME=/root; export PATH=\\$PATH:/usr/bin/local:/sbin:/usr/sbin; \$*\"" > $dir/usr/bin/sudo
+  chmod 755 $dir/usr/bin/sudo
   chmod -R u+rwX "$dir/var"
   chmod -R g-w "$dir"
   chmod go-w $dir
+  echo -e '# do not edit\n# debootstrap-container will generate apt-get commands here' > $dir/install.packages
+  read -p "strip to minimize containersize? (y/n) " strip 
+  [[ "$strip" == "y" ]] && {
+    rm -rf $dir/var/cache/apt/archives/*;
+  }
 }
 
-# adds container to filesystem
+mount_dirs(){
+  set -u
+  mount proc $1/proc -t proc
+  mount sysfs $1/sys -t sysfs
+}
+
+link_system(){
+  [[ ${#1} == 0 ]] && { echo "please provide containerdir"; exit 1; }
+  [[ ${#2} == 0 ]] && { echo "please provide user"; exit 1; }
+  [[ $(readlink -f $1/lib) == "/" ]]    && { echo "no thats evil"; exit 1; }
+  [[ $(readlink -f $1/lib) == "/lib" ]] && { echo "no thats evil"; exit 1; }
+  #mount --bind /home/$user $1/root
+  echo "fakechroot fakeroot chroot $1 dpkg --get-selections" > $1/var/packages.minbase.txt # remember packages
+  echo -e "/install.packages\n# put your own automation scripts below\n# they will get triggered upon debootstrap-container import\n" > $1/install
+  echo "proc $1/proc proc defaults 0 0" >> $1/fstab
+  echo "sysfs $1/sys sysfs defaults 0 0" >> $1/etc/fstab
+  cp /etc/hosts $1/etc/hosts
+  mount_dirs "$1"
+  mkdir $1/home/$user
+  ln -sf /.bashrc $1/home/$user/.
+  ln -sf /.bashrc $1/home/$user/.bash_profile
+}
+
+set_permissions(){
+  echo -e "\nsetting permissions"
+  [[ ${#1} == 0 ]] && { echo "please provide containerdir"; exit 1; }
+  [[ ${#2} == 0 ]] && { echo "please provide user"; exit 1; }
+  set -u
+  chown -R $user:$user "$containerpath/$name"*
+  #chmod ug+rwX $1
+  chmod go-w $containerpath/$name
+  chown root:root $1/.bashrc $1
+  #chown $2:$2 $1/.bashrc /home/$2/.profile
+  #chmod 744 $dir/.bashrc /home/$user/.profile;
+  #chmod 770 $containerpath/$name/install
+}
+
+is_mounted(){
+  mount | grep -F "$1" &>/dev/null && return 0 || return 1
+}
+
+unlink_system(){
+  [[ ${#1} == 0 ]] && { echo "please provide containerdir"; exit 1; }
+  mount | grep -F "$1" | sed 's/.*on //g;s/ .*//g' | while read dir; do 
+    echo "unmounting $dir .."
+    umount "$dir"; 
+  done
+}
+
+# delete <containername> [containerpath]
+delete(){
+  [[ ! -n "$1" ]] && { echo "usage: $0 remove <containername> [containerpath]"; return 1; }
+  name="$1"; [[ -n "$2" ]] && containerpath="$2";
+  set -u; # halt on uninitialized variable (for safe rm)
+  check_safe "$containerpath/$name"
+  [[ ! -d $containerpath/$name ]] && { echo "sorry could not find dir $containerpath/$name"; exit 1 ;}
+  echo "unmounting $containerpath/$name/root and removing container"
+  unlink_system "$containerpath/$name"
+  is_mounted "$containerpath/$name" && { echo "could not delete container because of active mounts..please unmount containerdirectories manually"; exit 1; }
+  rm -rf $containerpath/$name
+  echo -e "done\n\nNOTE: /etc/ssh/sshd_config should be updated since the user still gets redirected to the container"
+}
+
+# add <containername> [release] [variant] [containerpath] 
 add(){
-  [[ ! -n "$1" ]] && { echo "usage: $0 add <containername> [containerpath] [distroname]"; return 1; }
+  [[ ! -n $1 ]] && { echo "usage: $0 add <containername> [release] [variant] [containerpath]"; return 1; }
   {
-    name="$1"; [[ -n "$2" ]] && containerpath="$2"; [[ -n "$3" ]] && image="$3"
-    [[ ! -d $containerpath/minbase ]] && genimage
+    name="$1"; [[ -n $2 ]] && release="$2"; [[ -n $3 ]] && variant="$3"; [[ -n $4 ]] && containerpath="$4"; set -u
+    [[ ! -d $containerpath ]] && { 
+      mkdir $containerpath  
+      chmod go-w $containerpath
+    }
+    [[ ! -d $containerpath/$release"-"$variant ]] && genimage 
     [[ -d $containerpath/$name ]] && { echo "$containerpath/$name already exists..exiting"; exit 1; }
-    [[ ! -d $containerpath/minbase ]] && { echo "could not find $containerpath/minbase, debootstrap failed earlier probably"; exit 1; }
-    cp -r $containerpath/minbase $containerpath/$name
-    mkdir $containerpath/$name/.container
-    echo -e '# do not edit\n# debootstrap-container will generate apt-get commands here' > $containerpath/$name/.container/install.packages
-    echo -e '# put here files/folders which you would like to backup during export or leave line below empty for full-backup\nsrv etc opt' > $containerpath/$name/.container/export.folders
+    [[ ! -d $containerpath/$release"-"$variant ]] && { echo "could not find $containerpath/$release"-"$variant, debootstrap failed earlier probably"; exit 1; }
+    cp -r $containerpath/$release"-"$variant $containerpath/$name
     read -p "enter user which should be 'root'? " user
-    [[ ! -d /home/$user ]] && { echo "could not find /home/$user dir..aborting"; exit 1; }
-    chown -R $user:$group "$containerpath/$name"
-    adduser $user "$name"
-    fakechroot fakeroot chroot $containerpath/$name dpkg --get-selections > $containerpath/$name/var/packages.minbase.txt # remember packages
-    echo -e '/install.packages\n# put your own automation scripts below\n# they will get triggered upon debootstrap-container import\n' > $containerpath/$name/.container/install
-    chmod 770 $containerpath/$name/install
+    adduser "$containerpath/$name" "$user"
+    set_permissions "$containerpath/$name" "$user"
+    link_system "$containerpath/$name" "$user"
     echo "created container '$containerpath/$name'"
   } | prettyprint
 }
 
-# adds user and gives (fake) root ssh access to container
+ # adds user and gives (fake) root ssh access to container
 adduser(){
-  user="$1"; name="$2"
-  mount --bind /home/$user $containerpath/$name/root
-  read -p "redirect user into container upon ssh-login? (y/n) " add; 
-  if [[ "$add" == "y" ]]; then 
-    echo -e "fakechroot fakeroot chroot $containerpath/$name /bin/bash --rcfile /root/.bashrc\nexit" > /home/$user/.profile
-    echo -e "export HOME=/root\nexport PS1='root@$name# '\nPROMPT_COMMAND='echo -ne \""'\033]0;${USER}@${HOSTNAME}: $name\007'"\";PS1=\"\$PS1\"'" >  $containerpath/$name/root/.bashrc
-    chown root:root $containerpath/$name/.bashrc /home/$user/.profile
-    chmod 700 $containerpath/$name/.bashrc 
-    chmod 744 /home/$user/.profile;
+  set -u ; dir="$1"; user="$2"
+  [[ ! -d /home/$user ]] && {
+    echo "creating user $user" && useradd "$user" -m -s /bin/bash -g $user
+    passwd $user
+  }
+  read -p "redirect user into container upon ssh-login? (y/n) " add;
+  if [[ "$add" == "y" ]]; then
+    echo -e "export HOME=/home/$user\nexport PS1='$user@$name $ '\nPROMPT_COMMAND='echo -ne \""'\033]0;${USER}@${HOSTNAME}: $name\007'"\";PS1=\"\$PS1\"'" >  $dir/.bashrc
+    echo -e "export HOME=/root\nexport PS1='root@$name # '\nPROMPT_COMMAND='echo -ne \""'\033]0;${USER}@${HOSTNAME}: $name\007'"\";PS1=\"\$PS1\"'" >  $dir/root/.bashrc
+    grep "Match User $2" /etc/ssh/sshd_config || {
+      sh -c 'echo "Match User '$2'\n  ChrootDirectory '$1'" >> /etc/ssh/sshd_config';
+      echo "NOTE: please restart your ssh daemon in order to get this to work!"
+    }
   fi
 }
 
 check(){
   {
     OK=0
-    for i in "${requirements[@]}"; do 
+    for i in "${requirements[@]}"; do
       which $i &>/dev/null || {
         read -p "$i is not installed..apt-get now? (y/n) " answer
-        [[ "$answer" == "y" ]] && sudo apt-get -y install $i || OK=1
+        [[ "$answer" == "y" ]] && apt-get -y install $i || OK=1
       }
     done
     return $OK
@@ -93,12 +168,20 @@ export(){
     [[ ! -d "$dir" ]] && { echo "container $dir does not exist"; exit 1; }
     echo "analyzing additional installed packages + backing up dirs: $backupdirs"
     fakechroot fakeroot chroot "$dir" dpkg --get-selections > $dir/var/packages.txt # dump packages
-    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /var/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install --force-yes /g'> $dir/.container/install.packages
+    fakechroot fakeroot chroot "$dir" sort /srv/packages.txt /var/packages.minbase.txt | uniq --unique | sed 's/\t.*//g;s/^/apt-get -y install --force-yes /g'> $dir/install.packages
     chmod 755 $dir/srv/install*
-    backupdirs="$(tail -n+2 $dir/.container/export.folders)"
     cd $dir; tar cpjf "$outfile" ${backupdirs}
     echo "written $outfile"
   } | prettyprint
+}
+
+wheezy_bugfix(){
+  echo "performing wheezy debootstrap libc <= 2.14 bugfix"
+  cd /tmp
+  wget "http://nl.archive.ubuntu.com/ubuntu/pool/main/e/eglibc/libc6-udeb_2.15-0ubuntu10.12_amd64.udeb"
+  wget "http://security.ubuntu.com/ubuntu/pool/main/e/eglibc/libc6-dev_2.15-0ubuntu10.11_amd64.deb"
+  dpkg -x libc6-dev_2.15-0ubuntu10.11_amd64.deb "$1"/.
+  dpkg -x libc6-udeb_2.15-0ubuntu10.12_amd64.udeb "$1"/.
 }
 
 import(){
@@ -107,23 +190,33 @@ import(){
   {
     [[ ! -d "$dir" ]] && { echo "creating new container"; add $(basename $dir); }
     [[ ! -d "$dir/usr" ]] && { echo "container $dir is not a container"; exit 1; }
+    set -u; # halt on uninitialized variable (for safe rm)
     echo "importing new installed packages + importing dirs: $backupdirs"
-    cd "$dir" && for bdir in $backupdirs;  do rm -rf $bdir; done
+    cd "$dir" && for bdir in $backupdirs;  do 
+      check_safe "$dir"
+      rm -rf $bdir; 
+    done
     tar vxpjf $targz | while read line; do tput el; printf "\r[x] unpacking: $line"; done; echo ""
-    fakechroot fakeroot chroot "$dir" bash /.container/install.packages  # install packages
-    fakechroot fakeroot chroot "$dir" bash /.container/install           # install packages
-    echo "done" 
+    fakechroot fakeroot chroot "$dir" bash /install.packages  # install packages
+    fakechroot fakeroot chroot "$dir" bash /install           # install packages
+    echo "done"
   } | prettyprint
 }
 
+# run <containerdir/name> 
 run(){
-  [[ "$(whoami)" == root ]] && { echo "please do not run container as root"; exit 1; }
-  [[ ! -n "$1" ]] && { echo "usage: $0 run <containerdir>"; return 1; } 
-  fakechroot fakeroot chroot "$1" /bin/bash /boot.container
+  [[ "$(whoami)" == root ]] && { echo "please do not run container as root";  }
+  [[ ! -n "$1" ]] && { echo "usage: $0 run <containerdir>"; return 1; }
+  fakechroot fakeroot chroot "$1" /bin/bash --rcfile "$1/.bashrc"
 }
 
-prettyprint(){ 
+prettyprint(){
   cat - | while read line; do echo "[x] $line"; done;
 }
 
-check && [[ -n "$1" ]] && { "$@"; } || { add; run; import; export; }
+# showreleases
+showreleases(){
+  find /usr/share/debootstrap/scripts | while read file; do printf "%-20s (%s)\n" "$(basename "$file")" "$(grep variants "$file" | sed 's/ - /: /g')"; done
+}
+
+check && [[ -n "$1" ]] && { "$@"; } || { echo -e "Usage: \n"; grep "(){" -B1 "$0" | grep "^#" | sed 's/#/'$(basename "$0")'/g'; }
