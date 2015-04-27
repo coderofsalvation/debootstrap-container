@@ -102,6 +102,9 @@ The following files would automate this:
     echo /usr/bin/flock -w 0 /root/.screen.lock /usr/bin/screen -s /bin/bash -d -m &
 
 This would mount some needed folders (/sys /proc) and start+detach the screen during startup.
+To start services by default just do something like:
+
+    echo "/etc/init.d/mysql status || /etc/init.d/mysql restart" >> /srv/containers/foo/.bashrc
 
 ### Sudo 
 
