@@ -75,7 +75,10 @@ To keep the container alive after logouts/timeouts:
 
 * get a passwordless ssh-login working:
 
-    $ ssh-copy-id foo@localhost
+    $ su foo
+    foo $ ssh-keygen <enter><enter><enter>
+    foo $ ssh-copy-id foo@localhost
+    foo $ exit
     $ ln -fs /srv/containers/foo/home/foo/.ssh /home/foo/.
 
 * run gnu 'screen' as root (apt-get install screen)
