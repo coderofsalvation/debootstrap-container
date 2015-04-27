@@ -3,9 +3,18 @@ debootstrap-container
 
 <img src=".res/logo.png"/>
 
-simple way of running multiple debian containers on a (openvz) VPS 
+simple way of running multiple debian ssh-able containers on a (openvz) VPS 
 
 > CAUTION: this shellscript requires root, use at own risk.
+
+# Usage
+
+    Usage: 
+    
+    debootstrap-container delete <containername> [containerpath]
+    debootstrap-container add <containername> [release] [variant] [containerpath] 
+    debootstrap-container run <containerdir/name> 
+    debootstrap-container showreleases
 
 ### Howto
 
@@ -42,7 +51,7 @@ I had to go another road to satisfy my needs:
 * I want to run node- or apache/lighttpd applications in a container
 * I want to ssh to a container and feel like I have root-access
 * I want to be somewhat compatible with docker
-* I want dont want to waste diskspace (bare debootstrap container is 124mb)
+* Doesnt use too much diskspace (bare debootstrap container is 124mb)
 
 ### Docker compatibility
 
@@ -57,7 +66,7 @@ However, avoid symbolic links since it will confuse applications when resolving 
 
     mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
 
-> WARNING: if you do this, always use 'debootstrap-container delete <yourcontainer>' to delete a container.
+> WARNING: always use 'debootstrap-container delete <yourcontainer>' to delete a container.
 Using a plain 'sudo rm -rf /srv/containers/yourcontainer' might cause dataloss for folders using 'mount --bind'
 
 ### TIP: persistent containers
