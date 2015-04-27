@@ -73,9 +73,13 @@ Using a plain 'sudo rm -rf /srv/containers/yourcontainer' might cause dataloss f
 
 To keep the container alive after logouts/timeouts:
 
-* run gnu 'screen' as root *once* (apt-get install screen)
-* from this screen, ssh into your container(s) (ssh foo@localhost)
-* make sure to run ssh-copy-id on your container (passwordless login)
+* get a passwordless ssh-login working:
+
+    $ ssh-copy-id foo@localhost
+    $ ln -fs /srv/containers/foo/home/foo/.ssh /home/foo/.
+
+* run gnu 'screen' as root (apt-get install screen)
+* inside this screen, ssh into your container(s) (ssh foo@localhost)
 * and leave it there (ctrl A-D)
 
 By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container. You can even run a screen inside your container if you want to.
