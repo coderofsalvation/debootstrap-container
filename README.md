@@ -29,7 +29,7 @@ simple way of running multiple debian ssh-able containers on a (openvz) VPS
 
     $ ssh foo@localhost
     foo@foo# whoami
-    uid=1003 gid=1004 groups=1004
+    uid=1003(foo) gid=1004 groups=1004
 
     foo@foo# sudo whoami
     root
