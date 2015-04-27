@@ -11,7 +11,7 @@ set -e; # halt on error
 requirements=(debootstrap fakechroot fakeroot)
 release="wheezy"
 variant="minbase"
-group=users
+group=ssh
 backupdirs="srv etc opt"
 containerpath="/srv/containers"
 
@@ -19,7 +19,7 @@ genimage(){
   {
     echo -e "about to generate $release ($variant) template debian filesystem\n\nfirst time will take a while..\n"; sleep 1s;
     packages="fakeroot,fakechroot"
-    debootstrap --include="$packages" --variant=$variant $release $containerpath/$release"-"$variant || { echo "something went wrong :("; return 1; }
+    debootstrap --no-check-gpg --include="$packages" --variant=$variant $release $containerpath/$release"-"$variant || { echo "something went wrong :("; return 1; }
     patch "$containerpath/$release"-"$variant"
   } | prettyprint
 }
@@ -50,6 +50,7 @@ mount_dirs(){
   set -u
   mount proc $1/proc -t proc
   mount sysfs $1/sys -t sysfs
+  mount devpts $1/dev/pts -t devpts
 }
 
 link_system(){
@@ -64,9 +65,6 @@ link_system(){
   echo "sysfs $1/sys sysfs defaults 0 0" >> $1/etc/fstab
   cp /etc/hosts $1/etc/hosts
   mount_dirs "$1"
-  mkdir $1/home/$user
-  ln -sf /.bashrc $1/home/$user/.
-  ln -sf /.bashrc $1/home/$user/.bash_profile
 }
 
 set_permissions(){
@@ -74,10 +72,11 @@ set_permissions(){
   [[ ${#1} == 0 ]] && { echo "please provide containerdir"; exit 1; }
   [[ ${#2} == 0 ]] && { echo "please provide user"; exit 1; }
   set -u
-  chown -R $user:$user "$containerpath/$name"*
+  chown -R $user:$group "$containerpath/$name"*
   #chmod ug+rwX $1
   chmod go-w $containerpath/$name
   chown root:root $1/.bashrc $1
+  chown -R $user:$group $1/home/$user
   #chown $2:$2 $1/.bashrc /home/$2/.profile
   #chmod 744 $dir/.bashrc /home/$user/.profile;
   #chmod 770 $containerpath/$name/install
@@ -134,7 +133,8 @@ add(){
 adduser(){
   set -u ; dir="$1"; user="$2"
   [[ ! -d /home/$user ]] && {
-    echo "creating user $user" && useradd "$user" -m -s /bin/bash -g $user
+    grep -F "$group" /etc/group || groupadd "$group"
+    echo "creating user $user" && useradd "$user" -m -s /bin/bash -g $group
     passwd $user
   }
   read -p "redirect user into container upon ssh-login? (y/n) " add;
@@ -145,6 +145,11 @@ adduser(){
       sh -c 'echo "Match User '$2'\n  ChrootDirectory '$1'" >> /etc/ssh/sshd_config';
       echo "NOTE: please restart your ssh daemon in order to get this to work!"
     }
+    grep -F "$user" /etc/passwd >> $dir/etc/passwd # make sure su can resolve username
+    grep -F "$group" /etc/group >> $dir/etc/group  # make sure su can resolve group
+    [[ ! -d $dir/home/$user ]] && mkdir $dir/home/$user
+    ln -sf /.bashrc $dir/home/$user/.
+    ln -sf /.bashrc $dir/home/$user/.bash_profile
   fi
 }
 
