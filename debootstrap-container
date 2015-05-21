@@ -18,7 +18,7 @@ containerpath="/srv/containers"
 genimage(){
   {
     echo -e "about to generate $release ($variant) template debian filesystem\n\nfirst time will take a while..\n"; sleep 1s;
-    packages="fakeroot,fakechroot"
+    packages="fakeroot,fakechroot,psmisc,procps"
     debootstrap --no-check-gpg --include="$packages" --variant=$variant $release $containerpath/$release"-"$variant || { echo "something went wrong :("; return 1; }
     patch "$containerpath/$release"-"$variant"
   } | prettyprint
@@ -63,6 +63,7 @@ link_system(){
   echo -e "/install.packages\n# put your own automation scripts below\n# they will get triggered upon debootstrap-container import\n" > $1/install
   echo "proc $1/proc proc defaults 0 0" >> $1/fstab
   echo "sysfs $1/sys sysfs defaults 0 0" >> $1/etc/fstab
+  cp /etc/resolv.conf $1/etc/resolv.conf
   cp /etc/hosts $1/etc/hosts
   mount_dirs "$1"
 }
