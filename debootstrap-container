@@ -121,7 +121,10 @@ add(){
     [[ ! -d $containerpath/$release"-"$variant ]] && genimage 
     [[ -d $containerpath/$name ]] && { echo "$containerpath/$name already exists..exiting"; exit 1; }
     [[ ! -d $containerpath/$release"-"$variant ]] && { echo "could not find $containerpath/$release"-"$variant, debootstrap failed earlier probably"; exit 1; }
-    cp -r $containerpath/$release"-"$variant $containerpath/$name
+    echo "starting to copy..(please wait)"
+    mkdir $containerpath/$name 
+    rsync -ravuzi $containerpath/$release"-"$variant/* $containerpath/$name/. &>/dev/null
+    rsync -ravuzi $containerpath/$release"-"$variant/.* $containerpath/$name/. &>/dev/null
     read -p "enter user which should be 'root'? " user
     adduser "$containerpath/$name" "$user"
     set_permissions "$containerpath/$name" "$user"
