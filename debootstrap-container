@@ -124,7 +124,6 @@ add(){
     echo "starting to copy..(please wait)"
     mkdir $containerpath/$name 
     rsync -ravuzi $containerpath/$release"-"$variant/* $containerpath/$name/. &>/dev/null
-    rsync -ravuzi $containerpath/$release"-"$variant/.* $containerpath/$name/. &>/dev/null
     read -p "enter user which should be 'root'? " user
     adduser "$containerpath/$name" "$user"
     set_permissions "$containerpath/$name" "$user"
@@ -154,6 +153,7 @@ adduser(){
     [[ ! -d $dir/home/$user ]] && mkdir $dir/home/$user
     ln -sf /.bashrc $dir/home/$user/.
     ln -sf /.bashrc $dir/home/$user/.bash_profile
+    echo -e "done\n\nNOTE: please run: 'sudo service restart ssh'"
   fi
 }
 
