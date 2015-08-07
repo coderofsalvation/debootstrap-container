@@ -11,8 +11,8 @@ simple way of running multiple debian ssh-able containers on a (openvz) VPS
 
     Usage: 
     
-    debootstrap-container delete <containername> [containerpath]
-    debootstrap-container add <containername> [release] [variant] [containerpath] 
+    debootstrap-container delete <containername>
+    debootstrap-container add <containername> [release] [variant]
     debootstrap-container run <containerdir/name> 
     debootstrap-container showreleases
 
