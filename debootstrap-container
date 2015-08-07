@@ -53,6 +53,7 @@ mount_dirs(){
   mount devpts $1/dev/pts -t devpts
 }
 
+# link_system <containerpath> <user>
 link_system(){
   [[ ${#1} == 0 ]] && { echo "please provide containerdir"; exit 1; }
   [[ ${#2} == 0 ]] && { echo "please provide user"; exit 1; }
@@ -86,6 +87,7 @@ is_mounted(){
   mount | grep -F "$1" &>/dev/null && return 0 || return 1
 }
 
+# unlink_system <containerpath> 
 unlink_system(){
   [[ ${#1} == 0 ]] && { echo "please provide containerdir"; exit 1; }
   mount | grep -F "$1" | sed 's/.*on //g;s/ .*//g' | while read dir; do 
@@ -94,7 +96,7 @@ unlink_system(){
   done
 }
 
-# delete <containername> [containerpath]
+# delete <containername>
 delete(){
   [[ ! -n "$1" ]] && { echo "usage: $0 remove <containername> [containerpath]"; return 1; }
   name="$1"; [[ -n "$2" ]] && containerpath="$2";
@@ -108,9 +110,9 @@ delete(){
   echo -e "done\n\nNOTE: /etc/ssh/sshd_config should be updated since the user still gets redirected to the container"
 }
 
-# add <containername> [release] [variant] [containerpath] 
+# add <containername> [release] [variant] 
 add(){
-  [[ ! -n $1 ]] && { echo "usage: $0 add <containername> [release] [variant] [containerpath]"; return 1; }
+  [[ ! -n $1 ]] && { echo "usage: $0 add <containername> [release] [variant]"; return 1; }
   {
     name="$1"; [[ -n $2 ]] && release="$2"; [[ -n $3 ]] && variant="$3"; [[ -n $4 ]] && containerpath="$4"; set -u
     [[ ! -d $containerpath ]] && { 
