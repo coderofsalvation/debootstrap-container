@@ -2,9 +2,9 @@
 <html>
 
   <head>
-    <meta charset='utf-8' />
-    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
-    <meta name="description" content="Debootstrap-container : simple way of running multiple debian containers on a (openvz) VPS" />
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Debootstrap-container : simple way of running multiple debian containers on a (openvz) VPS">
 
     <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
 
@@ -32,68 +32,55 @@
     <div id="main_content_wrap" class="outer">
       <section id="main_content" class="inner">
         <h1>
-<a name="debootstrap-container" class="anchor" href="#debootstrap-container"><span class="octicon octicon-link"></span></a>debootstrap-container</h1>
+<a id="debootstrap-container" class="anchor" href="#debootstrap-container" aria-hidden="true"><span class="octicon octicon-link"></span></a>debootstrap-container</h1>
 
-<p>simple way of running multiple debian containers on a (openvz) VPS </p>
+<p><img src="https://raw.githubusercontent.com/coderofsalvation/debootstrap-container/master/.res/logo.png"></p>
+
+<p>simple way of running multiple debian ssh-able containers on a (openvz) VPS </p>
+
+<blockquote>
+<p>CAUTION: this shellscript requires root, use at own risk.</p>
+</blockquote>
+
+<h1>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span class="octicon octicon-link"></span></a>Usage</h1>
+
+<pre><code>Usage: 
+
+debootstrap-container delete &lt;containername&gt;
+debootstrap-container add &lt;containername&gt; [release] [variant]
+debootstrap-container run &lt;containerdir/name&gt; 
+debootstrap-container showreleases
+</code></pre>
 
 <h3>
-<a name="howto" class="anchor" href="#howto"><span class="octicon octicon-link"></span></a>Howto</h3>
+<a id="howto" class="anchor" href="#howto" aria-hidden="true"><span class="octicon octicon-link"></span></a>Howto</h3>
 
-<pre><code>$ sudo adduser myusername
-$ sudo debootstrap-container add mycontainer
-enter user which should be 'root'? myusername
+<pre><code>$ sudo debootstrap-container add foo
+enter user which should be 'root'? foo 
+adding new user 'foo'
+Enter new UNIX password: 
+Retype new UNIX password: 
+passwd: password updated successfully 
 redirect user into container upon ssh-login? (y/n) y
-[x] created container '/srv/containers/flop'
-$ ssh myusername@localhost
-root@mycontainer# whoami
-root@mycontainer# root
-root@mycontainer# apt-get install python2
-root@mycontainer# exit
+[x] created container '/srv/containers/foo'
+
+$ ssh foo@localhost
+foo@foo# whoami
+uid=1003(foo) gid=1004 groups=1004
+
+foo@foo# sudo whoami
+root
+
+foo@foo# sudo apt-get install python2
+foo@foo# exit
 </code></pre>
 
-<p>now the funpart is: python2 is only installed in the container.
-removing /srv/containers means all packages in the container are removed as well.</p>
-
-<p>If you are only interested in local development, you can easily access the container locally as well:</p>
-
-<pre><code>$ whoami 
-myusername
-$ debootstrap-container run /srv/containers/foo
-root@mycontainer# whoami
-root@mycontainer# root
-</code></pre>
-
-<p>Or how about exporting our container to a tarball</p>
-
-<pre><code>$ debootstrap-container export /src/containers/mycontainer /tmp/mycontainer.tar.bz2
-[x] analyzing additional installed packages + backing up dirs: srv etc opt
-[x] written /tmp/mycontainer.tar.gz
-</code></pre>
-
-<p>Only the newly installed packagenames + some dirs are in the tar (instead of the whole rootfilesystem).
-Lets overwrite our container with an exported tarball:</p>
-
-<pre><code>$ debootstrap-container import /src/containers/mycontainer /tmp/mycontainer.tar.bz2  # overwrites container
-[x] Reading package lists...
-[x] Building dependency tree...
-[x] The following extra packages will be installed:
-[x] python2 
-</code></pre>
-
-<p>Or simple start a fresh container 'mycontainer2' based on our exported tarball:</p>
-
-<pre><code>$ debootstrap-container import /src/containers/mycontainer2 /tmp/mycontainer.tar.bz2 # creates clone
-[x] Reading package lists...
-[x] Building dependency tree...
-[x] The following extra packages will be installed:
-[x] python2 
-[x] done
-$ ssh mycontainer2@localhost
-root@mycontainer# whoami (..and so on..)
-</code></pre>
+<p>now the funpart is: python2 is only installed in the container, and the sudo is 
+actually fakeroot.</p>
 
 <h3>
-<a name="why" class="anchor" href="#why"><span class="octicon octicon-link"></span></a>Why</h3>
+<a id="why" class="anchor" href="#why" aria-hidden="true"><span class="octicon octicon-link"></span></a>Why</h3>
 
 <p>I am a huge fan of <a href="http://docker.io">docker</a> but unfortunately I had to do multiple projects inside one VPS server.
 I could not get docker working, and solutions like <a href="https://github.com/jpetazzo/sekexe">sekexe</a> or jailkit pointed into more possible hassle.
@@ -101,13 +88,15 @@ I had to go another road to satisfy my needs:</p>
 
 <ul>
 <li>I want to install packages in a container, <em>outside</em> the real host</li>
-<li>I want to easily import, export, delete containers</li>
+<li>I want to easily backup/restore containers</li>
 <li>I want to run node- or apache/lighttpd applications in a container</li>
 <li>I want to ssh to a container and feel like I have root-access</li>
 <li>I want to be somewhat compatible with docker</li>
-<li>I want dont want to waste diskspace (bare debootstrap container is 124mb)</li>
-</ul><h3>
-<a name="docker-compatibility" class="anchor" href="#docker-compatibility"><span class="octicon octicon-link"></span></a>Docker compatibility</h3>
+<li>Doesnt use too much diskspace (bare debootstrap container is 124mb)</li>
+</ul>
+
+<h3>
+<a id="docker-compatibility" class="anchor" href="#docker-compatibility" aria-hidden="true"><span class="octicon octicon-link"></span></a>Docker compatibility</h3>
 
 <p>It <em>should</em> be compatible with docker, just tar your jail-dir like so:</p>
 
@@ -115,7 +104,7 @@ I had to go another road to satisfy my needs:</p>
 </code></pre>
 
 <h3>
-<a name="tip-shared-directoreis" class="anchor" href="#tip-shared-directoreis"><span class="octicon octicon-link"></span></a>TIP: shared directoreis</h3>
+<a id="tip-shared-directories" class="anchor" href="#tip-shared-directories" aria-hidden="true"><span class="octicon octicon-link"></span></a>TIP: shared directories</h3>
 
 <p>Sharing directories across containers (originating from outside the container) can be handy.
 However, avoid symbolic links since it will confuse applications when resolving absolute paths, instead mount like so:</p>
@@ -123,30 +112,72 @@ However, avoid symbolic links since it will confuse applications when resolving 
 <pre><code>mount --bind /opt/somefolder /srv/containers/mycontainer/opt/somefolder
 </code></pre>
 
-<h3>
-<a name="tip-persistent-containers" class="anchor" href="#tip-persistent-containers"><span class="octicon octicon-link"></span></a>TIP: persistent containers</h3>
-
-<p>You'll notice that daemons inside containers (like lighttpd or mysql) will eventually die when a user logs off.
-This is why there's the file <code>/boot.container</code> (symlink to /etc/rc.local) where you can define daemons.
-Its a bit quickndirty but it looks like this:</p>
-
-<pre><code>/etc/init.d/lighttpd restart
-/etc/init.d/mysql restart
-
-# quickndirty to let process wait forever
-while true; do sleep 1000000; done
-</code></pre>
-
-<p>Then make sure you run the following (as the container user):</p>
-
-<pre><code>$ su myusername -c "nohup debootstrap-container run /srv/containers/lemon" &amp;
-$ disown
-</code></pre>
-
-<p>Done! now daemons inside your container will stay alive.</p>
+<blockquote>
+<p>WARNING: always use 'debootstrap-container delete ' to delete a container.
+Using a plain 'sudo rm -rf /srv/containers/yourcontainer' might cause dataloss for folders using 'mount --bind'</p>
+</blockquote>
 
 <h3>
-<a name="conclusion" class="anchor" href="#conclusion"><span class="octicon octicon-link"></span></a>Conclusion</h3>
+<a id="tip-persistent-containers" class="anchor" href="#tip-persistent-containers" aria-hidden="true"><span class="octicon octicon-link"></span></a>TIP: persistent containers</h3>
+
+<p>To keep the container alive after logouts/timeouts, first get a passwordless ssh-login working:</p>
+
+<pre><code>$ su foo
+foo $ ssh-keygen &lt;enter&gt;&lt;enter&gt;&lt;enter&gt;
+foo $ ssh-copy-id foo@localhost
+foo $ exit
+$ ln -fs /srv/containers/foo/home/foo/.ssh /home/foo/.
+</code></pre>
+
+<p>Then: </p>
+
+<ul>
+<li>run gnu 'screen' as root (apt-get install screen)</li>
+<li>inside this screen, ssh into your container(s) (ssh foo@localhost)</li>
+<li>and leave it there (ctrl A-D)</li>
+</ul>
+
+<p>By doing so, the master-screen process will always be persistent, and you can just ssh from anywhere directly into your ssh-container. You can even run a screen inside your container if you want to.
+The following files would automate this:</p>
+
+<p>/root/.screen </p>
+
+<pre><code>screen -T xterm -t container_foo 1 su foo -c 'ssh foo@localhost'
+screen -T xterm -t container_bar 2 su bar -c 'ssh bar@localhost'
+</code></pre>
+
+<p>/etc/init.d/screen </p>
+
+<pre><code>#!/bin/bash
+find /srv/containers -mindepth 1 -maxdepth 1 -type d | while read dir; do       
+  /root/lemon/server/debootstrap-container/debootstrap-container mount_dirs "$dir"
+done
+echo /usr/bin/flock -w 0 /root/.screen.lock /usr/bin/screen -s /bin/bash -d -m &amp;
+</code></pre>
+
+<p>This would mount some needed folders (/sys /proc) and start+detach the screen during startup.
+To start services by default just do something like:</p>
+
+<pre><code>echo "/etc/init.d/mysql status || /etc/init.d/mysql restart" &gt;&gt; /srv/containers/foo/.bashrc
+</code></pre>
+
+<h3>
+<a id="sudo" class="anchor" href="#sudo" aria-hidden="true"><span class="octicon octicon-link"></span></a>Sudo</h3>
+
+<p>The containers use a sudo-shellscript at /usr/bin/sudo which uses fakeroot.
+To prevent users from installing software please remove the /usr/bin/fakeroot binary.</p>
+
+<h3>
+<a id="history" class="anchor" href="#history" aria-hidden="true"><span class="octicon octicon-link"></span></a>History</h3>
+
+<ul>
+<li>Sun Apr 26 21:43:47 CEST 2015 refactor: debootstrap doesnt run by root-user, but with sudo cmds</li>
+<li>Sun Apr 26 21:43:47 CEST 2015 refactor: added remove function </li>
+<li>Mon Apr 27 12:53:50 CEST 2015 refactor: removed import/export: just tar the container at /src/container/*</li>
+</ul>
+
+<h3>
+<a id="conclusion" class="anchor" href="#conclusion" aria-hidden="true"><span class="octicon octicon-link"></span></a>Conclusion</h3>
 
 <p>This is definately not secure or as cool as docker, but it is an tidy way to deploy
 applications on a openvz container (which doesnt run docker).</p>
@@ -157,7 +188,7 @@ applications on a openvz container (which doesnt run docker).</p>
     <div id="footer_wrap" class="outer">
       <footer class="inner">
         <p class="copyright">Debootstrap-container maintained by <a href="https://github.com/coderofsalvation">coderofsalvation</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
       </footer>
     </div>
 
